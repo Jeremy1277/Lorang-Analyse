@@ -1,0 +1,3836 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FLOW ANALYSE</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600;700&family=Barlow+Condensed:wght@400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --am-navy: #004D8C;
+    --am-blue: #0066B3;
+    --am-light: #E8F2FA;
+    --am-green: #67D848;
+    --am-orange: #F5831F;
+    --am-red: #D32F2F;
+    --am-amber: #F9A825;
+    --text-primary: #0D1B2A;
+    --text-secondary: #4A6080;
+    --text-muted: #8AA0B8;
+    --border: #D0DDE8;
+    --bg: #F4F7FA;
+    --card: #FFFFFF;
+    --shadow: 0 1px 4px rgba(0,77,140,0.08), 0 4px 16px rgba(0,77,140,0.06);
+    --radius: 10px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  /* ── TOP BAR ── */
+  .topbar {
+    background: var(--am-navy); color: white;
+    padding: 0 28px; height: 60px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 16px;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,0,0,.25);
+  }
+  .topbar-left { grid-column: 1; justify-self: start; display: flex; align-items: center; gap: 0; min-width: 0; }
+  .logo-block {
+    display: flex; align-items: center; justify-content: center;
+    margin-right: 18px; padding-right: 18px;
+    border-right: 1px solid rgba(255,255,255,.15);
+    flex: 0 0 auto;
+  }
+  .brand-logo {
+    height: 42px; width: 56px; object-fit: contain;
+    background: rgba(255,255,255,.96);
+    border-radius: 8px; padding: 4px;
+    box-shadow: 0 1px 5px rgba(0,0,0,.18);
+    display: block;
+  }
+  .app-name-block { display: flex; flex-direction: column; gap: 1px; }
+  .app-name {
+    font-family: 'Barlow', sans-serif; font-weight: 600; font-size: 16px;
+    letter-spacing: .04em; color: white; line-height: 1;
+    display: flex; align-items: center; gap: 0;
+  }
+  .app-name-flow    { color: rgba(255,255,255,.90); font-weight: 300; }
+  .app-name-analyse { color: rgba(134,188,36,.90); font-weight: 700; }
+  .app-sub {
+    font-family: 'Barlow', sans-serif; font-size: 11px; font-weight: 300;
+    color: rgba(255,255,255,.45); letter-spacing: .03em;
+  }
+  .topbar-actions { grid-column: 3; justify-self: end; display: flex; gap: 8px; align-items: center; }
+  .btn {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 7px 14px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-ghost { background: rgba(255,255,255,0.12); color: white; }
+  .btn-ghost:hover { background: rgba(255,255,255,0.22); }
+  .btn-dataflow { background: rgba(133,188,37,.18); color: #c8f06a; border: 1px solid rgba(133,188,37,.35); font-weight: 600; }
+  .btn-dataflow:hover { background: rgba(133,188,37,.28); }
+  .btn-dataflow:disabled { opacity: .5; cursor: wait; }
+  .fts-bar { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:500; border:1px solid transparent; white-space:nowrap; }
+  .fts-bar.fts-loading { color: rgba(255,255,255,.5); background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.1); }
+  .fts-bar.fts-ok      { background: rgba(133,188,37,.18); color: #c8f06a; border-color: rgba(133,188,37,.35); }
+  .fts-bar.fts-err     { background: rgba(220,50,50,.18); color: #ffaaaa; border-color: rgba(220,50,50,.3); }
+  #btn-refresh:not([disabled]):hover { background: rgba(255,255,255,0.22); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #btn-refresh.spinning { pointer-events: none; opacity: 0.7; }
+  #btn-refresh.spinning span { display:inline-block; animation: spin 0.6s linear infinite; }
+  .btn-primary { background: var(--am-green); color: #0D1B2A; }
+  .btn-primary:hover { background: #7AE85E; }
+  .btn-danger { background: var(--am-red); color: white; }
+  .btn-danger:hover { background: #B71C1C; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── LAYOUT ── */
+  .container { max-width: 1600px; margin: 0 auto; padding: 20px 24px; }
+
+  /* ── UPLOAD ZONE ── */
+  .upload-section {
+    background: var(--card);
+    border: 1.5px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    margin-bottom: 24px;
+    transition: border-color 0.2s;
+  }
+  .upload-section:hover { border-color: var(--am-blue); }
+  .upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .upload-item { display: flex; flex-direction: column; gap: 8px; }
+  .upload-label { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); }
+  .upload-box {
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: var(--bg);
+  }
+  .upload-box:hover { border-color: var(--am-blue); background: var(--am-light); }
+  .upload-box.loaded { border-color: var(--am-green); background: #F0FBF0; }
+  .upload-icon { font-size: 20px; }
+  .upload-text { flex: 1; }
+  .upload-name { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+  .upload-hint { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .upload-status { font-size: 11px; font-weight: 500; color: var(--am-green); }
+  input[type=file] { display: none; }
+
+  /* ── FILTERS ── */
+  .filters-bar {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin-bottom: 20px;
+    display: grid;
+    grid-template-columns: repeat(8, minmax(120px, 1fr)) auto;
+    align-items: end;
+    gap: 10px 14px;
+    box-shadow: var(--shadow);
+    position: relative;
+    z-index: 30;
+  }
+  .filter-group { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .filter-label { font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); white-space: nowrap; }
+  .filter-select, .filter-input {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 8px;
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-primary);
+    background: white;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.15s;
+    width: 100%;
+    min-width: 0;
+  }
+  .filter-select:focus, .filter-input:focus { border-color: var(--am-blue); }
+
+  .multi-filter { position: relative; width: 100%; }
+  .multi-filter-btn {
+    font-family: 'DM Sans', sans-serif;
+    width: 100%;
+    min-height: 34px;
+    padding: 6px 30px 6px 8px;
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    background: white;
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .multi-filter-btn::after {
+    content: '▾';
+    position: absolute;
+    right: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 10px;
+  }
+  .multi-filter.open .multi-filter-btn { border-color: var(--am-blue); box-shadow: 0 0 0 2px rgba(0,102,179,.08); }
+  .multi-filter.open .multi-filter-btn::after { content: '▴'; }
+  .multi-panel {
+    display: none;
+    position: absolute;
+    z-index: 200;
+    top: calc(100% + 6px);
+    left: 0;
+    width: min(300px, 90vw);
+    background: white;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(13,27,42,.18);
+    padding: 8px;
+  }
+  .multi-filter.open .multi-panel { display: block; }
+  .multi-search {
+    font-family: 'DM Sans', sans-serif;
+    width: 100%;
+    padding: 7px 8px;
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+    outline: none;
+    margin-bottom: 7px;
+  }
+  .multi-search:focus { border-color: var(--am-blue); }
+  .multi-actions { display: flex; gap: 6px; margin-bottom: 7px; }
+  .multi-mini-btn {
+    flex: 1;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text-secondary);
+    border-radius: 5px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 4px 6px;
+    cursor: pointer;
+  }
+  .multi-mini-btn:hover { background: var(--am-light); color: var(--am-navy); }
+  .multi-options { max-height: 210px; overflow-y: auto; padding-right: 2px; }
+  .multi-option {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 4px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-primary);
+  }
+  .multi-option:hover { background: var(--am-light); }
+  .multi-option input { width: 14px; height: 14px; accent-color: var(--am-blue); cursor: pointer; }
+  .multi-empty { padding: 8px; color: var(--text-muted); font-size: 12px; text-align: center; }
+  .btn-run {
+    background: var(--am-navy);
+    color: white;
+    font-size: 12px;
+    padding: 7px 18px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600;
+    transition: background 0.15s;
+    white-space: nowrap;
+    align-self: end;
+    height: 34px;
+  }
+  .btn-run:hover { background: var(--am-blue); }
+  @media (max-width: 1200px) {
+    .filters-bar { grid-template-columns: repeat(4, 1fr); }
+    .btn-run { grid-column: 1 / -1; }
+  }
+  @media (max-width: 900px) {
+    .filters-bar { grid-template-columns: repeat(3, 1fr); }
+    .btn-run { grid-column: 1 / -1; }
+  }
+  @media (max-width: 700px) {
+    .filters-bar { grid-template-columns: repeat(2, 1fr); }
+    .btn-run { grid-column: 1 / -1; }
+  }
+
+  /* ── SECTION HEADER ── */
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 28px 0 14px;
+  }
+  .section-header h2 {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+  }
+  .section-header .line { flex: 1; height: 1px; background: var(--border); }
+  .section-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--am-navy); }
+
+  /* ── KPI GRID ── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+  .kpi-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    box-shadow: var(--shadow);
+    border-top: 3px solid var(--am-navy);
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-card::after {
+    content: '';
+    position: absolute;
+    right: -10px; top: -10px;
+    width: 60px; height: 60px;
+    border-radius: 50%;
+    background: var(--am-light);
+    opacity: 0.5;
+  }
+  .kpi-label { font-size: 11px; color: var(--text-muted); font-weight: 400; margin-bottom: 4px; }
+  .kpi-value { font-family: 'DM Mono', monospace; font-size: 24px; font-weight: 500; color: var(--am-navy); line-height: 1; }
+  .kpi-sub { font-size: 11px; color: var(--text-secondary); margin-top: 5px; }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+  }
+  .card-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+    margin-bottom: 14px;
+  }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+
+  /* ── TABLE ── */
+  .tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .tbl th {
+    text-align: left;
+    padding: 5px 8px;
+    color: var(--text-muted);
+    font-weight: 500;
+    font-size: 11px;
+    border-bottom: 1.5px solid var(--border);
+    white-space: nowrap;
+  }
+  .tbl td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-primary);
+  }
+  .tbl tr:last-child td { border-bottom: none; }
+  .tbl tr:hover td { background: var(--am-light); }
+
+  /* ── ALERT ── */
+  .alert {
+    border-left: 3px solid var(--am-red);
+    background: #FFF3F3;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    font-size: 12px;
+    color: var(--am-red);
+    line-height: 1.6;
+  }
+  .alert-warn {
+    border-left-color: var(--am-amber);
+    background: #FFFBF0;
+    color: #8a6000;
+  }
+  .alert-ok {
+    border-left-color: var(--am-green);
+    background: #F0FBF0;
+    color: #2E7D32;
+  }
+
+  /* ── BADGE ── */
+  .badge {
+    display: inline-block;
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-weight: 600;
+  }
+  .badge-danger { background: #FFEBEE; color: var(--am-red); }
+  .badge-warn { background: #FFF8E1; color: #8a6000; }
+  .badge-ok { background: #E8F5E9; color: #2E7D32; }
+  .badge-blue { background: var(--am-light); color: var(--am-navy); }
+  .badge-ext { background: #FFF3E0; color: #E65100; }
+
+  /* ── BAR CHART ── */
+  .bar-row { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+  .bar-name { font-size: 11px; font-weight: 500; min-width: 32px; color: var(--text-primary); }
+  .bar-track { flex: 1; background: var(--bg); border-radius: 4px; height: 8px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; background: var(--am-blue); transition: width 0.4s ease; }
+  .bar-fill.cip { background: var(--am-navy); }
+  .bar-fill.fca { background: var(--am-amber); }
+  .bar-val { font-size: 11px; color: var(--text-secondary); min-width: 110px; text-align: right; }
+
+  /* ── DAY GRID ── */
+  .day-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .day-card {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+    border: 1px solid var(--border);
+  }
+  .day-name { font-size: 10px; color: var(--text-muted); margin-bottom: 4px; }
+  .day-val { font-family: 'DM Mono', monospace; font-size: 20px; font-weight: 500; color: var(--am-navy); }
+  .day-sub { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+  /* ── SEMAINE FORECAST ── */
+  .sem-block {
+    padding: 12px 14px;
+    border-radius: 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    margin-bottom: 8px;
+  }
+  .sem-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .sem-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+  .sem-bar-wrap { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin-bottom: 6px; }
+  .sem-cip { background: var(--am-navy); }
+  .sem-fca { background: var(--am-amber); }
+  .sem-meta { font-size: 11px; color: var(--text-secondary); display: flex; gap: 12px; }
+  .sem-meta span { display: flex; align-items: center; gap: 4px; }
+  .dot-cip { width: 8px; height: 8px; border-radius: 50%; background: var(--am-navy); }
+  .dot-fca { width: 8px; height: 8px; border-radius: 50%; background: var(--am-amber); }
+
+  /* ── ORDER DETAIL ── */
+  .order-row {
+    display: flex;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    align-items: flex-start;
+  }
+  .order-row:last-child { border-bottom: none; }
+  .order-num { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-muted); min-width: 96px; padding-top: 2px; }
+  .order-info { flex: 1; font-size: 12px; line-height: 1.6; }
+  .order-from { font-weight: 600; color: var(--am-navy); }
+  .tag { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 6px; font-weight: 600; margin-left: 6px; }
+  .tag-ext { background: #FFF3E0; color: #E65100; }
+  .tag-std { background: var(--am-light); color: var(--am-navy); }
+
+  /* ── FORMAT TOGGLE ── */
+  .format-toggle {
+    display: flex;
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .fmt-btn {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .fmt-btn:hover { background: var(--am-light); color: var(--am-navy); }
+  .fmt-btn.active { background: var(--am-navy); color: white; }
+  #mail-html-frame {
+    display: none;
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    min-height: 600px;
+  }
+
+  /* ── MAIL PREVIEW ── */
+  #mail-section {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: var(--shadow);
+    display: none;
+    margin-top: 24px;
+  }
+  #mail-section.visible { display: block; }
+  .mail-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .mail-header h3 { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+  #mail-content {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    line-height: 1.8;
+    color: var(--text-primary);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    white-space: pre-wrap;
+    max-height: 600px;
+    overflow-y: auto;
+    user-select: all;
+  }
+  .copy-btn {
+    background: var(--am-navy);
+    color: white;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 7px 14px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .copy-btn:hover { background: var(--am-blue); }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+  }
+  .empty-icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-text { font-size: 14px; font-weight: 500; color: var(--text-secondary); }
+  .empty-hint { font-size: 12px; margin-top: 6px; }
+
+  /* ── LEGEND ── */
+  .legend { display: flex; gap: 14px; margin-bottom: 10px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-secondary); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+
+
+  /* ── VISUAL POPUP ── */
+  .zoomable-visual {
+    cursor: zoom-in;
+    position: relative;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .zoomable-visual:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(0,77,140,0.10), 0 8px 24px rgba(0,77,140,0.10);
+  }
+  .zoomable-visual::before {
+    content: '⛶';
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    z-index: 2;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(0,77,140,0.08);
+    color: var(--am-navy);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    opacity: 0;
+    transition: opacity 0.15s ease, background 0.15s ease;
+    pointer-events: none;
+  }
+  .zoomable-visual:hover::before { opacity: 1; background: rgba(0,77,140,0.14); }
+  .visual-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 28px;
+    background: rgba(13,27,42,0.58);
+    backdrop-filter: blur(3px);
+  }
+  .visual-modal.visible { display: flex; }
+  .visual-modal-panel {
+    width: min(1100px, 94vw);
+    max-height: 88vh;
+    background: var(--card);
+    border-radius: 16px;
+    box-shadow: 0 18px 60px rgba(0,0,0,0.35);
+    overflow: hidden;
+    animation: modalPop 0.16s ease-out;
+  }
+  @keyframes modalPop {
+    from { transform: scale(0.96); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  .visual-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 18px;
+    background: var(--am-navy);
+    color: white;
+  }
+  .visual-modal-title {
+    font-family: 'Barlow', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+  }
+  .visual-modal-close {
+    border: none;
+    background: rgba(255,255,255,0.14);
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+  }
+  .visual-modal-close:hover { background: rgba(255,255,255,0.24); }
+  .visual-modal-body {
+    padding: 20px;
+    max-height: calc(88vh - 60px);
+    overflow: auto;
+    background: var(--bg);
+  }
+  .visual-modal-body .card,
+  .visual-modal-body .kpi-card {
+    box-shadow: none;
+    transform: none !important;
+    cursor: default;
+    margin: 0 !important;
+    width: 100%;
+  }
+  .visual-modal-body .zoomable-visual::before { display: none; }
+  .visual-modal-body .chart-wrap { height: 430px !important; }
+  .visual-modal-body .chart-snapshot {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 8px;
+  }
+  body.modal-open { overflow: hidden; }
+
+  /* ── AFFICHAGE DA ── */
+  .da-display-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 28px;
+    background: rgba(13,27,42,0.62);
+    backdrop-filter: blur(3px);
+  }
+  .da-display-modal.visible { display: flex; }
+  .da-display-panel {
+    width: min(1280px, 96vw);
+    max-height: 90vh;
+    background: var(--card);
+    border-radius: 16px;
+    box-shadow: 0 18px 60px rgba(0,0,0,0.35);
+    overflow: hidden;
+    animation: modalPop 0.16s ease-out;
+  }
+  .da-display-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 18px;
+    background: var(--am-navy);
+    color: white;
+  }
+  .da-display-title {
+    font-family: 'Barlow', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+  }
+  .da-display-subtitle {
+    font-size: 11px;
+    font-weight: 400;
+    color: rgba(255,255,255,.62);
+    margin-top: 2px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .da-display-close {
+    border: none;
+    background: rgba(255,255,255,0.14);
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+  }
+  .da-display-close:hover { background: rgba(255,255,255,0.24); }
+  .da-display-body {
+    padding: 18px;
+    max-height: calc(90vh - 60px);
+    overflow: auto;
+    background: var(--bg);
+  }
+  .da-display-filters {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 14px;
+    box-shadow: var(--shadow);
+    display: grid;
+    grid-template-columns: repeat(3, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 14px;
+    position: relative;
+    z-index: 50;
+  }
+  .da-display-datebox {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .da-display-date-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .da-input {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 8px;
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-primary);
+    background: white;
+    outline: none;
+    width: 100%;
+  }
+  .da-input:focus { border-color: var(--am-blue); }
+  .da-display-actions {
+    display: flex;
+    gap: 8px;
+    align-items: end;
+  }
+  .da-display-btn {
+    border: none;
+    border-radius: 6px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 8px 12px;
+    cursor: pointer;
+    height: 34px;
+    white-space: nowrap;
+  }
+  .da-display-btn.primary { background: var(--am-navy); color: white; }
+  .da-display-btn.primary:hover { background: var(--am-blue); }
+  .da-display-btn.secondary { background: var(--bg); color: var(--text-secondary); border: 1px solid var(--border); }
+  .da-display-btn.secondary:hover { background: var(--am-light); color: var(--am-navy); }
+  .da-display-result-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 14px;
+    box-shadow: var(--shadow);
+  }
+  .da-display-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .da-display-count {
+    font-family: 'DM Mono', monospace;
+    font-size: 20px;
+    color: var(--am-navy);
+    font-weight: 600;
+  }
+  .da-display-context {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+  .da-table-wrap { max-height: 430px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+  .da-table { width: 100%; border-collapse: collapse; font-size: 12px; background: white; }
+  .da-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    text-align: left;
+    background: var(--am-navy);
+    color: white;
+    padding: 8px 9px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    white-space: nowrap;
+  }
+  .da-table td {
+    padding: 7px 9px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-primary);
+    white-space: nowrap;
+  }
+  .da-table tr:hover td { background: var(--am-light); }
+  .da-table .mono { font-family: 'DM Mono', monospace; color: var(--am-navy); font-weight: 500; }
+  .da-display-empty {
+    text-align: center;
+    padding: 34px 20px;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+  @media (max-width: 1050px) {
+    .da-display-filters { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
+  }
+  @media (max-width: 700px) {
+    .da-display-filters { grid-template-columns: 1fr; }
+    .da-display-date-row { grid-template-columns: 1fr; }
+    .da-display-actions { flex-direction: column; align-items: stretch; }
+    .da-display-btn { width: 100%; }
+  }
+
+  /* ── PRINT ── */
+  @media print {
+    .topbar, .upload-section, .filters-bar, #mail-section, .btn, .btn-run { display: none !important; }
+    body { background: white; }
+    .card, .kpi-card { box-shadow: none; border: 1px solid #ccc; }
+  }
+
+  /* ══════════════════════════════════════════
+     VIEW SWITCHING
+  ══════════════════════════════════════════ */
+  .view-pane { display: none; }
+  .view-pane.active { display: block; }
+
+  /* Topbar center fix */
+  .topbar-left { flex-shrink: 0; }
+
+  .view-toggle {
+    grid-column: 2;
+    justify-self: center;
+    display: flex;
+    background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.20);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 0;
+    flex-shrink: 0;
+  }
+  .view-tab {
+    font-family: 'Barlow', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    padding: 6px 16px;
+    border: none;
+    background: transparent;
+    color: rgba(255,255,255,.65);
+    cursor: pointer;
+    transition: all .15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .view-tab:hover { background: rgba(255,255,255,.12); color: white; }
+  .view-tab.active {
+    background: var(--am-green);
+    color: #0D1B2A;
+  }
+  .view-tab .tab-icon { font-size: 13px; }
+
+  /* ══════════════════════════════════════════
+     SAP VIEW — TABLE + FILTERS
+  ══════════════════════════════════════════ */
+
+  /* KPI bar SAP */
+  .sap-kpi-bar {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .sap-kpi-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+    border-left: 3px solid var(--am-navy);
+  }
+  .sap-kpi-card.green { border-left-color: #86BC24; }
+  .sap-kpi-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-muted);
+    margin-bottom: 5px;
+  }
+  .sap-kpi-value {
+    font-family: 'Barlow Condensed', 'DM Mono', monospace;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--am-navy);
+    line-height: 1;
+  }
+  .sap-kpi-card.green .sap-kpi-value { color: #4a7c10; }
+  .sap-kpi-sub { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-muted); margin-top: 3px; }
+
+  /* Sticky filters SAP */
+  .sap-filters-wrap {
+    position: sticky;
+    top: 60px;
+    z-index: 200;
+    margin-bottom: 14px;
+  }
+  .sap-filters-bar {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 10px 16px;
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+    box-shadow: 0 2px 8px rgba(0,77,140,.12);
+  }
+  .sap-fg { display: flex; flex-direction: column; gap: 3px; flex-shrink: 0; min-width: 100px; }
+  .sap-fg.wide { min-width: 140px; }
+  .sap-fg-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .sap-select, .sap-input {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 5px 7px;
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-primary);
+    background: white;
+    cursor: pointer;
+    outline: none;
+    transition: border-color .15s;
+    width: 100%;
+    height: 30px;
+  }
+  .sap-select:focus, .sap-input:focus { border-color: var(--am-blue); }
+  .sap-input[type=date] { cursor: text; }
+  .sap-filter-sep { width: 1px; height: 30px; background: var(--border); align-self: flex-end; flex-shrink: 0; }
+  .sap-search-wrap {
+    display: flex;
+    align-items: center;
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    height: 30px;
+  }
+  .sap-search-input {
+    border: none !important;
+    border-radius: 0 !important;
+    flex: 1;
+    height: 100%;
+    padding: 0 8px;
+    font-size: 12px;
+    font-family: 'DM Sans', sans-serif;
+    outline: none;
+    color: var(--text-primary);
+  }
+  .sap-search-btn {
+    background: var(--am-navy);
+    border: none;
+    cursor: pointer;
+    padding: 0 10px;
+    height: 100%;
+    color: white;
+    display: flex;
+    align-items: center;
+    transition: background .15s;
+    flex-shrink: 0;
+  }
+  .sap-search-btn:hover { background: var(--am-blue); }
+  .sap-raz { align-self: flex-end; flex-shrink: 0; }
+  .btn-sap-red {
+    background: var(--am-red);
+    color: white;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 0 14px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    height: 30px;
+    transition: background .15s;
+  }
+  .btn-sap-red:hover { background: #B71C1C; }
+
+  /* Active search tag */
+  .sap-active-search {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    background: #EBF3FC;
+    border: 1px solid #B8D4EA;
+    border-radius: 8px;
+    padding: 6px 12px;
+    margin-bottom: 10px;
+    font-size: 12px;
+  }
+  .sap-active-tag {
+    background: var(--am-navy);
+    color: white;
+    border-radius: 10px;
+    padding: 2px 9px;
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .sap-rm { cursor: pointer; opacity: .7; }
+  .sap-rm:hover { opacity: 1; }
+
+  /* SAP table */
+  .sap-table-wrap {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .sap-table-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+    background: #F8FAFC;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .sap-table-info strong { color: var(--text-primary); }
+  .sap-table-scroll {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: calc(100vh - 60px - 56px - 14px - 36px - 20px);
+  }
+  .sap-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .sap-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--am-navy);
+    color: rgba(255,255,255,.88);
+    font-family: 'Barlow', 'DM Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    padding: 9px 11px;
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+  .sap-table thead th:hover { background: var(--am-blue); }
+  .sap-table thead th .sap-si { opacity: .35; margin-left: 3px; font-size: 9px; }
+  .sap-table thead th.asc .sap-si::after { content: "▲"; opacity: 1; }
+  .sap-table thead th.desc .sap-si::after { content: "▼"; opacity: 1; }
+  .sap-table thead th .sap-si::after { content: "⇅"; }
+  .sap-table tbody tr { border-bottom: 1px solid var(--border); transition: background .08s; }
+  .sap-table tbody tr:hover { background: #EBF3FC; }
+  .sap-table tbody tr:last-child { border-bottom: none; }
+  .sap-table td { padding: 6px 10px; white-space: nowrap; vertical-align: middle; }
+  .sap-mono { font-family: 'DM Mono', monospace; font-size: 11.5px; }
+  .sap-tr { text-align: right; }
+  .sap-pays-cell { font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 600; color: var(--am-navy); }
+  .sap-pays-name { font-size: 11px; color: var(--text-muted); margin-left: 4px; }
+
+  /* SAP Badges */
+  .sap-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+  }
+  .sap-b-prev { background: #E8F0FE; color: #1558B0; border: 1px solid #BDD0F8; }
+  .sap-b-da   { background: #EAF6D3; color: #4a7c10; border: 1px solid #B8DFA8; }
+  .sap-b-cip  { background: #EBF3FC; color: var(--am-navy); border: 1px solid #B8D4EA; }
+  .sap-b-fca  { background: #FEF9E7; color: #8B6914; border: 1px solid #F5DCA0; }
+  .sap-b-ddp  { background: #F5EEF8; color: #6C3483; border: 1px solid #D2B4DE; }
+  .sap-b-ext  { background: #FDF0E8; color: #C0511A; border: 1px solid #F5CCA8; }
+  .sap-b-std  { background: #E9F7EF; color: #1E8449; border: 1px solid #A9DFBF; }
+  .sap-b-cv1 {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 700; font-family: 'DM Mono', monospace;
+    background: rgba(21,88,176,0.15); color: #1558B0;
+    border: 1px solid rgba(21,88,176,0.30);
+  }
+  .sap-b-cv2 {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 700; font-family: 'DM Mono', monospace;
+    background: rgba(211,47,47,0.16); color: #C62828;
+    border: 1px solid rgba(211,47,47,0.32);
+  }
+  .sap-b-cv {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 700; font-family: 'DM Mono', monospace;
+    background: rgba(74,96,128,0.12); color: var(--text-secondary);
+    border: 1px solid rgba(74,96,128,0.25);
+  }
+
+  /* SAP Pagination */
+  .sap-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .sap-pg-btn {
+    min-width: 28px; height: 28px; border-radius: 5px;
+    border: 1px solid var(--border); background: white; cursor: pointer;
+    font-size: 12px; color: var(--text-secondary);
+    font-family: 'DM Mono', monospace;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 6px; transition: all .12s;
+  }
+  .sap-pg-btn:hover { border-color: var(--am-navy); color: var(--am-navy); }
+  .sap-pg-btn.active { background: var(--am-navy); color: white; border-color: var(--am-navy); }
+  .sap-pg-btn:disabled { opacity: .3; cursor: not-allowed; }
+  .sap-pg-sep { color: var(--text-muted); font-size: 12px; }
+
+  /* SAP empty state */
+  .sap-empty { padding: 60px 20px; text-align: center; color: var(--text-muted); }
+  .sap-empty-icon { font-size: 40px; margin-bottom: 10px; }
+  .sap-empty-title { font-size: 15px; font-weight: 600; color: var(--text-secondary); margin-bottom: 5px; }
+
+  /* Export btn */
+  .btn-sap-export {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 5px 12px;
+    border-radius: 6px;
+    border: 1.5px solid var(--border);
+    background: white;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all .15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .btn-sap-export:hover { border-color: var(--am-navy); color: var(--am-navy); }
+  .btn-sap-export:disabled { opacity: 0.4; cursor: not-allowed; }
+  @media (max-width: 900px) {
+    .sap-kpi-bar { grid-template-columns: repeat(3, 1fr); }
+    .sap-filters-bar { flex-wrap: wrap; }
+  }
+
+  /* ── CHART CONTAINER ── */
+  .chart-wrap { position: relative; height: 180px; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 800px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .grid2, .grid3 { grid-template-columns: 1fr; }
+    .day-grid { grid-template-columns: repeat(2, 1fr); }
+    .upload-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<header class="topbar">
+  <div class="topbar-left">
+    <div class="logo-block">
+      <img class="brand-logo" src="data:image/png;base64,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" alt="Lorang">
+    </div>
+    <div class="app-name-block">
+      <div class="app-name">
+        <span class="app-name-flow">FLOW</span><span class="app-name-analyse">ANALYSE</span>
+      </div>
+      <span class="app-sub">Suivi volumes LPL/RPS · V14 + DataFlow</span>
+    </div>
+  </div>
+
+  <!-- VIEW TOGGLE -->
+  <div class="view-toggle">
+    <button class="view-tab active" id="tab-analyse" onclick="switchView('analyse')">
+      <span class="tab-icon">📊</span> Analyse
+    </button>
+    <button class="view-tab" id="tab-sap" onclick="switchView('sap')">
+      <span class="tab-icon">🗂</span> SAP
+    </button>
+  </div>
+  <div class="topbar-actions analyse-only" id="topbar-analyse-actions">
+    <div class="fts-bar fts-loading" id="dataflow-bar">⚡ <span id="dataflow-status">non chargé</span></div>
+    <button class="btn btn-dataflow" id="btn-dataflow" onclick="loadDataFlowAnalyse()" title="Charger les fichiers via Microsoft Graph API">⚡ DataFlow</button>
+    <button class="btn btn-ghost" id="btn-refresh" onclick="runAnalysis()" disabled title="Relancer l'analyse avec les filtres actuels"><span>↺</span> Rafraîchir</button>
+    <button class="btn btn-ghost" id="btn-da-display" onclick="openDaDisplay()" disabled title="Afficher les DA depuis l'onglet Data">▤ Affichage DA</button>
+    <button class="btn btn-ghost" id="btn-mail" onclick="generateMail()" disabled>✉ Générer le mail</button>
+    <button class="btn btn-ghost" id="btn-pdf" onclick="exportPDF()" disabled>⬇ Export PDF</button>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- UPLOAD -->
+  <div class="upload-section">
+    <div class="upload-grid">
+      <div class="upload-item">
+        <span class="upload-label">📊 DA Expédiées (Confirmed)</span>
+        <div class="upload-box" id="box-da" onclick="loadDataFlowAnalyse()" style="cursor:pointer" title="Cliquer pour charger depuis SharePoint">
+          <span class="upload-icon">⚡</span>
+          <div class="upload-text">
+            <div class="upload-name" id="name-da">DA EXPEDIEES 2025.xlsm</div>
+            <div class="upload-hint">SharePoint · FLOW ANALYSE — cliquer pour charger</div>
+          </div>
+          <span class="upload-status" id="status-da" style="display:none">✓ Chargé</span>
+        </div>
+        <input type="file" id="input-da" accept=".xlsx,.xlsm,.xls" onchange="loadDA(this)" style="display:none">
+      </div>
+      <div class="upload-item">
+        <span class="upload-label">📋 Export Lorang SAP (Forecast)</span>
+        <div class="upload-box" id="box-sap" onclick="loadDataFlowAnalyse()" style="cursor:pointer" title="Cliquer pour charger depuis SharePoint">
+          <span class="upload-icon">⚡</span>
+          <div class="upload-text">
+            <div class="upload-name" id="name-sap">EXPORT LORANG.xlsm</div>
+            <div class="upload-hint">SharePoint · FLOW ANALYSE — cliquer pour charger</div>
+          </div>
+          <span class="upload-status" id="status-sap" style="display:none">✓ Chargé</span>
+        </div>
+        <input type="file" id="input-sap" accept=".xlsx,.xlsm,.xls" onchange="loadSAP(this)" style="display:none">
+      </div>
+    </div>
+  </div>
+
+  <!-- FILTERS -->
+  <div class="view-pane active" id="view-analyse">
+  <div class="filters-bar">
+    <div class="filter-group">
+      <span class="filter-label">Année</span>
+      <div class="multi-filter" id="mf-year"></div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Semaine confirmée</span>
+      <div class="multi-filter" id="mf-week"></div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Mois confirmée</span>
+      <div class="multi-filter" id="mf-month-confirmed"></div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Mois forecast</span>
+      <div class="multi-filter" id="mf-month-forecast"></div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Site de chargement</span>
+      <div class="multi-filter" id="mf-site"></div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Pays de livraison</span>
+      <div class="multi-filter" id="mf-pays"></div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Incoterm</span>
+      <div class="multi-filter" id="mf-inco"></div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Transporteur</span>
+      <div class="multi-filter" id="mf-transporteur"></div>
+    </div>
+    <button class="btn-run" onclick="runAnalysis()">▶ Analyser</button>
+  </div>
+
+  <!-- REPORT -->
+  <div id="report">
+    <div class="empty-state">
+      <div class="empty-icon">📦</div>
+      <div class="empty-text">Chargez vos fichiers et lancez l'analyse</div>
+      <div class="empty-hint">DA Expédiées + Export Lorang SAP → Analyser</div>
+    </div>
+  </div>
+
+  <!-- MAIL SECTION -->
+  <div id="mail-section">
+    <div class="mail-header">
+      <h3>✉ Mail pour Micael Arguello — AM LPL</h3>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="format-toggle">
+          <button class="fmt-btn active" id="btn-fmt-txt" onclick="setMailFormat('txt')">📄 Texte</button>
+          <button class="fmt-btn" id="btn-fmt-html" onclick="setMailFormat('html')">🖼 HTML</button>
+        </div>
+        <button class="copy-btn" id="copy-main-btn" onclick="copyMail()">Copier</button>
+      </div>
+    </div>
+    <div id="mail-content"></div>
+    <iframe id="mail-html-frame" frameborder="0"></iframe>
+  </div>
+
+</div><!-- /view-pane#view-analyse -->
+
+<!-- ══════════════════════════════════════════
+     SAP VIEW
+══════════════════════════════════════════ -->
+<div class="view-pane" id="view-sap">
+
+  <!-- SAP KPI BAR -->
+  <div class="sap-kpi-bar" id="sapKpiBar" style="display:none">
+    <div class="sap-kpi-card">
+      <div class="sap-kpi-label">Prévisions (SAP)</div>
+      <div class="sap-kpi-value" id="sapKpiPrevCt">—</div>
+      <div class="sap-kpi-sub" id="sapKpiPrevT">—</div>
+    </div>
+    <div class="sap-kpi-card green">
+      <div class="sap-kpi-label">DA expédiées</div>
+      <div class="sap-kpi-value" id="sapKpiDaCt">—</div>
+      <div class="sap-kpi-sub" id="sapKpiDaT">—</div>
+    </div>
+    <div class="sap-kpi-card">
+      <div class="sap-kpi-label">Tonnage total (To)</div>
+      <div class="sap-kpi-value" id="sapKpiTot">—</div>
+      <div class="sap-kpi-sub" id="sapKpiTotSub">—</div>
+    </div>
+    <div class="sap-kpi-card">
+      <div class="sap-kpi-label">Incoterms</div>
+      <div class="sap-kpi-value" id="sapKpiInco">—</div>
+      <div class="sap-kpi-sub" id="sapKpiIncoSub">—</div>
+    </div>
+    <div class="sap-kpi-card">
+      <div class="sap-kpi-label">Véhicules</div>
+      <div class="sap-kpi-value" id="sapKpiVeh">—</div>
+      <div class="sap-kpi-sub" id="sapKpiVehSub">—</div>
+    </div>
+  </div>
+
+  <!-- SAP FILTERS (sticky) -->
+  <div class="sap-filters-wrap" id="sapFiltersWrap" style="display:none">
+    <div class="sap-filters-bar">
+      <div class="sap-fg">
+        <span class="sap-fg-label">Source</span>
+        <select class="sap-select" id="sapFSource" onchange="sapApplyFilters()">
+          <option value="">Toutes</option>
+          <option value="PREV">Prévisions</option>
+          <option value="DA">DA</option>
+        </select>
+      </div>
+      <div class="sap-fg">
+        <span class="sap-fg-label">Incoterm</span>
+        <select class="sap-select" id="sapFInco" onchange="sapApplyFilters()">
+          <option value="">Tous</option>
+          <option value="CIP">CIP</option>
+          <option value="FCA">FCA</option>
+          <option value="DDP">DDP</option>
+        </select>
+      </div>
+      <div class="sap-fg">
+        <span class="sap-fg-label">Véhicule</span>
+        <select class="sap-select" id="sapFVeh" onchange="sapApplyFilters()">
+          <option value="">Tous</option>
+          <option value="Extensible">Extensible</option>
+          <option value="Standard">Standard</option>
+        </select>
+      </div>
+      <div class="sap-fg">
+        <span class="sap-fg-label">Code Validation</span>
+        <select class="sap-select" id="sapFCV" onchange="sapApplyFilters()">
+          <option value="">Tous</option>
+          <option value="1">Code 1</option>
+          <option value="2">Code 2</option>
+        </select>
+      </div>
+      <div class="sap-fg">
+        <span class="sap-fg-label">Site exp.</span>
+        <select class="sap-select" id="sapFSite" onchange="sapApplyFilters()">
+          <option value="">Tous</option>
+          <option value="Belval">Belval</option>
+          <option value="Mertert">Mertert</option>
+          <option value="Differdange">Differdange</option>
+          <option value="Messempré">Messempré</option>
+          <option value="Trier">Trier</option>
+        </select>
+      </div>
+      <div class="sap-fg">
+        <span class="sap-fg-label">Pays</span>
+        <select class="sap-select" id="sapFPays" onchange="sapApplyFilters()">
+          <option value="">Tous</option>
+        </select>
+      </div>
+      <div class="sap-filter-sep"></div>
+      <div class="sap-fg">
+        <span class="sap-fg-label">Date chgt. — du</span>
+        <input type="date" class="sap-input" id="sapFDateDu" onchange="sapApplyFilters()">
+      </div>
+      <div class="sap-fg">
+        <span class="sap-fg-label">Date chgt. — au</span>
+        <input type="date" class="sap-input" id="sapFDateAu" onchange="sapApplyFilters()">
+      </div>
+      <div class="sap-filter-sep"></div>
+      <div class="sap-fg wide">
+        <span class="sap-fg-label">Recherche rapide</span>
+        <div class="sap-search-wrap">
+          <input type="text" class="sap-search-input" id="sapQuickSearch"
+            placeholder="SAP / DA / Pays / Ville…" onkeydown="sapOnQSKey(event)">
+          <button class="sap-search-btn" onclick="sapApplyQS()">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="sap-raz">
+        <button class="btn-sap-red" onclick="sapRazFilters()">✕ RAZ</button>
+      </div>
+      <div style="align-self:flex-end;flex-shrink:0">
+        <button class="btn-sap-export" id="sapBtnExport" onclick="sapExportExcel()" disabled>
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Export Excel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTIVE SEARCH TAG -->
+  <div class="sap-active-search" id="sapActiveSearch">
+    <span style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px">Recherche :</span>
+    <div id="sapActiveTag"></div>
+    <span style="margin-left:auto;font-size:11px;color:var(--am-navy);cursor:pointer;font-weight:600" onclick="sapClearQS()">✕ Effacer</span>
+  </div>
+
+  <!-- SAP TABLE -->
+  <div class="sap-table-wrap" id="sapTableWrap" style="display:none">
+    <div class="sap-table-info">
+      <div id="sapTableInfo">—</div>
+    </div>
+    <div class="sap-table-scroll">
+      <table class="sap-table">
+        <thead id="sapTHead"></thead>
+        <tbody id="sapTBody"></tbody>
+      </table>
+    </div>
+    <div class="sap-pagination" id="sapPagination"></div>
+  </div>
+
+  <!-- SAP EMPTY STATE -->
+  <div class="sap-empty" id="sapEmpty">
+    <div class="sap-empty-icon">📂</div>
+    <div class="sap-empty-title">Chargez les fichiers pour afficher toutes les commandes</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:4px">EXPORT_LORANG.xlsm + DA_EXPEDIEES_2025.xlsm</div>
+  </div>
+
+</div><!-- /view-pane#view-sap -->
+
+</div><!-- /container -->
+
+<!-- AFFICHAGE DA POPUP -->
+<div class="da-display-modal" id="da-display-modal" aria-hidden="true" onclick="closeDaDisplay(event)">
+  <div class="da-display-panel" role="dialog" aria-modal="true" aria-labelledby="da-display-title" onclick="event.stopPropagation()">
+    <div class="da-display-header">
+      <div>
+        <div class="da-display-title" id="da-display-title">Affichage DA</div>
+        <div class="da-display-subtitle">Source : onglet Data — DA, SAP, Transporteur, Date, Pays, Ville</div>
+      </div>
+      <button class="da-display-close" type="button" onclick="closeDaDisplay()" aria-label="Fermer">×</button>
+    </div>
+    <div class="da-display-body">
+      <div class="da-display-filters">
+        <div class="filter-group">
+          <span class="filter-label">DA</span>
+          <div class="multi-filter" id="mf-da-display-da"></div>
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">SAP</span>
+          <div class="multi-filter" id="mf-da-display-sap"></div>
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">Transporteurs</span>
+          <div class="multi-filter" id="mf-da-display-transporteur"></div>
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">Date</span>
+          <div class="da-display-datebox">
+            <select class="da-input" id="da-display-date-mode" onchange="updateDaDateMode(); renderDaDisplayResults();">
+              <option value="">Toutes dates</option>
+              <option value="fixed">Date fixe</option>
+              <option value="range">Période</option>
+            </select>
+            <input class="da-input" type="date" id="da-display-date-fixed" style="display:none" onchange="renderDaDisplayResults()">
+            <div class="da-display-date-row" id="da-display-date-range" style="display:none">
+              <input class="da-input" type="date" id="da-display-date-start" onchange="renderDaDisplayResults()">
+              <input class="da-input" type="date" id="da-display-date-end" onchange="renderDaDisplayResults()">
+            </div>
+          </div>
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">Pays</span>
+          <div class="multi-filter" id="mf-da-display-pays"></div>
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">Ville</span>
+          <div class="multi-filter" id="mf-da-display-ville"></div>
+        </div>
+        <div class="da-display-actions">
+          <button class="da-display-btn primary" type="button" onclick="renderDaDisplayResults()">Afficher</button>
+          <button class="da-display-btn secondary" type="button" onclick="resetDaDisplay()">Réinitialiser</button>
+        </div>
+      </div>
+
+      <div class="da-display-result-card">
+        <div class="da-display-summary">
+          <div>
+            <div class="da-display-count" id="da-display-count">0 DA</div>
+            <div class="da-display-context" id="da-display-context">Charge le classeur DA Expédiées puis ouvre cette fenêtre.</div>
+          </div>
+        </div>
+        <div id="da-display-results"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- VISUAL POPUP -->
+<div class="visual-modal" id="visual-modal" aria-hidden="true" onclick="closeVisualPopup(event)">
+  <div class="visual-modal-panel" role="dialog" aria-modal="true" aria-labelledby="visual-modal-title" onclick="event.stopPropagation()">
+    <div class="visual-modal-header">
+      <div class="visual-modal-title" id="visual-modal-title">Détail du visuel</div>
+      <button class="visual-modal-close" type="button" onclick="closeVisualPopup()" aria-label="Fermer">×</button>
+    </div>
+    <div class="visual-modal-body" id="visual-modal-body"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// DATA STORE
+// ═══════════════════════════════════════════════
+/* ── MSAL / MICROSOFT GRAPH CONFIG ── */
+const MSAL_CONFIG={auth:{clientId:'56ae2586-8bb0-48a9-afd5-cb7a6bf12cc3',authority:'https://login.microsoftonline.com/08978fe5-0eb9-4b54-8f3d-dc0653f6dffa',redirectUri:window.location.origin},cache:{cacheLocation:'sessionStorage',storeAuthStateInCookie:false}};
+const GRAPH_SCOPES=['Files.Read.All','Sites.Read.All'];
+const GRAPH_HOST='luxportlu.sharepoint.com';
+const GRAPH_SITE_PATH='/sites/PROJECTSALESDEV';
+// Fichiers SharePoint — dossier FLOW ANALYSE
+const DA_FILE_PATH='FLOW ANALYSE/DA EXPEDIEES 2025.xlsm';
+const DA_SHARE_URL='https://luxportlu.sharepoint.com/:x:/s/PROJECTSALESDEV/IQAXh8uO_2HJRqjbe43N2PU9AW0wQwZ9jouENl1fGLs7JXM?e=4qh6Fd';
+const SAP_FILE_PATH='FLOW ANALYSE/EXPORT LORANG.xlsm';
+const SAP_SHARE_URL='https://luxportlu.sharepoint.com/:x:/s/PROJECTSALESDEV/IQDEab3ZZn8ZTacDq_R5Oro4AWzPuituxMR5WUWfe3NlorE?e=UbSZT9';
+
+let msalApp=null;
+async function loadMsalIfNeeded(){
+  if(typeof msal !== 'undefined') return;
+  return new Promise((resolve, reject)=>{
+    const s=document.createElement('script');
+    s.src='https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js';
+    s.onload=resolve;
+    s.onerror=()=>reject(new Error('Impossible de charger MSAL — vérifier la connexion internet'));
+    document.head.appendChild(s);
+  });
+}
+async function getMSAL(){
+  await loadMsalIfNeeded();
+  if(!msalApp){msalApp=new msal.PublicClientApplication(MSAL_CONFIG);await msalApp.initialize();}
+  return msalApp;
+}
+async function getToken(){
+  const app=await getMSAL();
+  const accounts=app.getAllAccounts();
+  if(accounts.length>0){
+    try{const r=await app.acquireTokenSilent({scopes:GRAPH_SCOPES,account:accounts[0]});return r.accessToken;}
+    catch(e){console.warn('[FlowAnalyse] Token silencieux impossible.',e);}
+  }
+  const r=await app.acquireTokenPopup({scopes:GRAPH_SCOPES});
+  return r.accessToken;
+}
+function graphShareId(url){
+  const b64=btoa(unescape(encodeURIComponent(url))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  return 'u!'+b64;
+}
+async function fetchGraphBinary(shareUrl, filePath, token){
+  const sitePath=encodeURIComponent(GRAPH_SITE_PATH).replace(/%2F/g,'/');
+  const endpoints=[
+    {label:'Lien partagé',url:`https://graph.microsoft.com/v1.0/shares/${graphShareId(shareUrl)}/driveItem/content`},
+    {label:'Chemin Graph',url:`https://graph.microsoft.com/v1.0/sites/${GRAPH_HOST}:${sitePath}:/drive/root:/${filePath.replace(/^\/+/,'').split('/').map(encodeURIComponent).join('/')}:/content`}
+  ];
+  let errors=[];
+  for(const ep of endpoints){
+    try{
+      const resp=await fetch(ep.url,{headers:{'Authorization':'Bearer '+token}});
+      if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      console.log('[FlowAnalyse][Graph] Succès:',ep.label,filePath);
+      return await resp.arrayBuffer();
+    }catch(e){errors.push(`${ep.label}: ${e.message}`);}
+  }
+  throw new Error(`Fichier introuvable: ${filePath}\n${errors.join('\n')}`);
+}
+
+let daData = null;
+let sapData = null;
+let analysisResult = null;
+let currentMailFormat = 'txt';
+let cachedMailTxt = '';
+let cachedMailHtml = '';
+
+const SITE_MAP = { '4003': 'Belval', 'M003': 'Mertert', '5003': 'Differdange', '6303': 'Pure', 'LT03': 'Trier' };
+const MONTHS_FR = ['', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+const DAYS_FR = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+
+// ── Multi filters ──
+const filterState = {};
+
+function escHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+}
+
+function normalizeText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function initMultiFilter(id, options, selectedValues = []) {
+  const root = document.getElementById(`mf-${id}`);
+  if (!root) return;
+  const previousSelected = filterState[id]?.selected || new Set();
+  const selected = selectedValues === null
+    ? new Set([...previousSelected].filter(v => options.some(o => String(o.value) === String(v))))
+    : new Set((selectedValues || []).map(String));
+
+  filterState[id] = {
+    options: options.map(o => ({ value: String(o.value), label: String(o.label ?? o.value) })),
+    selected
+  };
+
+  root.innerHTML = `
+    <button type="button" class="multi-filter-btn" title="Cliquer pour sélectionner une ou plusieurs valeurs"></button>
+    <div class="multi-panel">
+      <input type="text" class="multi-search" placeholder="Saisie manuelle / rechercher...">
+      <div class="multi-actions">
+        <button type="button" class="multi-mini-btn multi-select-visible">Tout cocher</button>
+        <button type="button" class="multi-mini-btn multi-clear">Tous</button>
+      </div>
+      <div class="multi-options"></div>
+    </div>`;
+
+  root.querySelector('.multi-panel').addEventListener('click', e => e.stopPropagation());
+
+  root.querySelector('.multi-filter-btn').addEventListener('click', e => {
+    e.stopPropagation();
+    document.querySelectorAll('.multi-filter.open').forEach(el => { if (el !== root) el.classList.remove('open'); });
+    root.classList.toggle('open');
+    if (root.classList.contains('open')) {
+      const search = root.querySelector('.multi-search');
+      search.value = '';
+      renderMultiOptions(id);
+      setTimeout(() => search.focus(), 0);
+    }
+  });
+
+  root.querySelector('.multi-search').addEventListener('input', () => renderMultiOptions(id));
+  root.querySelector('.multi-clear').addEventListener('click', e => {
+    e.stopPropagation();
+    filterState[id].selected.clear();
+    renderMultiOptions(id);
+    updateMultiSummary(id);
+  });
+  root.querySelector('.multi-select-visible').addEventListener('click', e => {
+    e.stopPropagation();
+    const term = normalizeText(root.querySelector('.multi-search').value);
+    filterState[id].options.forEach(opt => {
+      if (!term || normalizeText(opt.label).includes(term) || normalizeText(opt.value).includes(term)) {
+        filterState[id].selected.add(opt.value);
+      }
+    });
+    renderMultiOptions(id);
+    updateMultiSummary(id);
+  });
+
+  renderMultiOptions(id);
+  updateMultiSummary(id);
+}
+
+function renderMultiOptions(id) {
+  const root = document.getElementById(`mf-${id}`);
+  const state = filterState[id];
+  if (!root || !state) return;
+  const term = normalizeText(root.querySelector('.multi-search')?.value || '');
+  const visibleOptions = state.options.filter(opt =>
+    !term || normalizeText(opt.label).includes(term) || normalizeText(opt.value).includes(term)
+  );
+  const box = root.querySelector('.multi-options');
+  if (!visibleOptions.length) {
+    box.innerHTML = '<div class="multi-empty">Aucune valeur trouvée</div>';
+    return;
+  }
+  box.innerHTML = visibleOptions.map(opt => `
+    <label class="multi-option">
+      <input type="checkbox" value="${escHtml(opt.value)}" ${state.selected.has(opt.value) ? 'checked' : ''}>
+      <span>${escHtml(opt.label)}</span>
+    </label>`).join('');
+  box.querySelectorAll('input[type=checkbox]').forEach(input => {
+    input.addEventListener('change', e => {
+      const val = String(e.target.value);
+      if (e.target.checked) state.selected.add(val);
+      else state.selected.delete(val);
+      updateMultiSummary(id);
+    });
+  });
+}
+
+function updateMultiSummary(id) {
+  const root = document.getElementById(`mf-${id}`);
+  const state = filterState[id];
+  if (!root || !state) return;
+  const btn = root.querySelector('.multi-filter-btn');
+  const selected = [...state.selected];
+  if (!selected.length) {
+    btn.textContent = 'Tous';
+    btn.title = 'Tous';
+    return;
+  }
+  const labels = selected.map(v => state.options.find(o => o.value === v)?.label || v);
+  btn.textContent = labels.length <= 2 ? labels.join(', ') : `${labels.length} valeurs`;
+  btn.title = labels.join(', ');
+}
+
+function getMultiValues(id) {
+  return [...(filterState[id]?.selected || new Set())];
+}
+
+function getMultiLabel(id, emptyLabel = 'Tous') {
+  const state = filterState[id];
+  const selected = getMultiValues(id);
+  if (!state || !selected.length) return emptyLabel;
+  return selected.map(v => state.options.find(o => o.value === v)?.label || v).join(', ');
+}
+
+function matchSelected(value, selectedValues) {
+  return !selectedValues.length || selectedValues.includes(String(value));
+}
+
+function populateMultiFilter(id, values, selectedValues = null) {
+  const options = values.map(v => typeof v === 'object' ? v : ({ value: v, label: v }));
+  initMultiFilter(id, options, selectedValues);
+}
+
+document.addEventListener('click', () => {
+  document.querySelectorAll('.multi-filter.open').forEach(el => el.classList.remove('open'));
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.querySelectorAll('.multi-filter.open').forEach(el => el.classList.remove('open'));
+});
+
+const MONTH_OPTIONS = MONTHS_FR.slice(1).map((m, i) => ({ value: i + 1, label: m }));
+const WEEK_OPTIONS = Array.from({ length: 53 }, (_, i) => ({ value: i + 1, label: `S${i + 1}` }));
+
+populateMultiFilter('year', [{ value: 2026, label: '2026' }, { value: 2025, label: '2025' }], ['2026']);
+populateMultiFilter('week', WEEK_OPTIONS, ['18']);
+populateMultiFilter('month-confirmed', MONTH_OPTIONS, []);
+populateMultiFilter('month-forecast', MONTH_OPTIONS, ['5']);
+populateMultiFilter('site', Object.entries(SITE_MAP).map(([value, label]) => ({ value, label: `${label} (${value})` })), []);
+populateMultiFilter('pays', [], []);
+populateMultiFilter('inco', [{ value: 'CIP', label: 'CIP' }, { value: 'FCA', label: 'FCA' }], []);
+populateMultiFilter('transporteur', [], []);
+
+// ═══════════════════════════════════════════════
+// FILE LOADING
+// ═══════════════════════════════════════════════
+function getCol(row, names) {
+  for (const name of names) {
+    if (row[name] !== undefined && row[name] !== null) return row[name];
+  }
+  const normalizedKey = Object.keys(row).find(k =>
+    names.some(name => String(k).trim().toLowerCase() === String(name).trim().toLowerCase())
+  );
+  return normalizedKey ? row[normalizedKey] : null;
+}
+
+function processDABuffer(buffer, fileName) {
+  const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
+  const sheet = wb.Sheets['Data'] || wb.Sheets[wb.SheetNames[0]];
+  daData = XLSX.utils.sheet_to_json(sheet, { defval: null });
+  daData = daData.map(r => ({
+    DA: r['DA'],
+    SAP: r['SAP'],
+    KG: +r['KG'] || 0,
+    TONNES: +r['TONNES'] || 0,
+    REMORQUE: r['REMORQUE'] || '',
+    TRANSPORTEUR: String(getCol(r, ['Transporteur', 'TRANSPORTEUR', 'transporteur']) ?? '').trim(),
+    EXPEDITEUR: String(r['EXPEDITEUR'] || '').trim(),
+    PAYS: r['PAYS'] || '',
+    VILLE: r['VILLE'] || '',
+    CP: r['CP'] || '',
+    DATE: r['DATE CHGT'] instanceof Date ? r['DATE CHGT'] : (() => { const d = new Date(r['DATE CHGT']); return isNaN(d) ? null : d; })(),
+    SEMAINE: +r['SEMAINE'] || 0,
+    INCOTERME: r['INCOTERME'] || '',
+  }));
+  document.getElementById('name-da').textContent = fileName;
+  document.getElementById('status-da').style.display = '';
+  document.getElementById('box-da').classList.add('loaded');
+  const daDisplayBtn = document.getElementById('btn-da-display');
+  if (daDisplayBtn) daDisplayBtn.disabled = false;
+  const paysSet = [...new Set(daData.map(r => r.PAYS).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), 'fr'));
+  populateMultiFilter('pays', paysSet, null);
+  const transporteurSet = [...new Set(daData.map(r => r.TRANSPORTEUR).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), 'fr'));
+  populateMultiFilter('transporteur', transporteurSet, null);
+  sapParseDA(wb);
+  checkReady();
+}
+
+function loadDA(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => processDABuffer(e.target.result, file.name);
+  reader.readAsArrayBuffer(file);
+}
+
+function processSAPBuffer(buffer, fileName) {
+  const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
+  const isLorang = !!wb.Sheets['LORANG'];
+  const sheet = wb.Sheets['LORANG'] || wb.Sheets['DRAFT SAP'] || wb.Sheets[wb.SheetNames[0]];
+  const raw = XLSX.utils.sheet_to_json(sheet, { defval: null });
+  sapData = raw.map(r => {
+    const inco = r['INCO'] || '';
+    const incoNorm = ['CPT','CIF'].includes(inco) ? 'CIP' : inco;
+    if (isLorang) {
+      const lorangDate = r['Date exp.SECOND LAST'];
+      let anneeLorang = 0;
+      if (lorangDate instanceof Date) {
+        anneeLorang = lorangDate.getFullYear();
+      } else if (typeof lorangDate === 'number') {
+        const dp = XLSX.SSF.parse_date_code(lorangDate);
+        anneeLorang = dp ? dp.y : 0;
+      }
+      return {
+        Order: r['Order'] || '',
+        Site: String(r['Point exp.'] || '').trim(),
+        Pays: r['Pays dest. LEG'] || '',
+        Ville: r['Ville'] || '',
+        Lg: +r['LONG FINALE'] || 0,
+        INCO: incoNorm,
+        TO: +r['TO FINALE'] || 0,
+        Code: +r['CODE VALIDATION'] || 0,
+        Semaine: +r['Semaine'] || 0,
+        Mois: +r['Mois '] || +r['Mois'] || 0,
+        Annee: anneeLorang,
+      };
+    } else {
+      const rawDate = r['Date exp.SECOND LAST'];
+      let d = null;
+      if (rawDate instanceof Date) d = rawDate;
+      else if (typeof rawDate === 'number') d = XLSX.SSF.parse_date_code(rawDate);
+      else if (rawDate) d = new Date(rawDate);
+      return {
+        Order: r['Order'] || '',
+        Site: String(r['Point exp.'] || '').trim(),
+        Pays: r['Pays dest. LEG'] || '',
+        Ville: r['Ville'] || '',
+        Lg: (+r['Lg'] || 0) / 1000,
+        INCO: incoNorm,
+        TO: (+r['TO à exp'] || 0) / 1000,
+        Code: +r['Code periode date'] || 0,
+        Semaine: d ? getISOWeek(d) : 0,
+        Mois: d ? (d instanceof Date ? d.getMonth()+1 : d.m) : 0,
+        Annee: d ? (d instanceof Date ? d.getFullYear() : d.y) : 0,
+      };
+    }
+  });
+  document.getElementById('name-sap').textContent = fileName + (isLorang ? ' ✓ onglet LORANG' : ' (DRAFT SAP)');
+  document.getElementById('status-sap').style.display = '';
+  document.getElementById('box-sap').classList.add('loaded');
+  sapParseLorang(wb);
+  checkReady();
+}
+
+function loadSAP(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => processSAPBuffer(e.target.result, file.name);
+  reader.readAsArrayBuffer(file);
+}
+
+/* ── DATAFLOW AUTOMATIQUE — Graph API ── */
+async function loadDataFlowAnalyse() {
+  const btn = document.getElementById('btn-dataflow');
+  const bar = document.getElementById('dataflow-bar');
+  const lbl = document.getElementById('dataflow-status');
+  btn.disabled = true; btn.textContent = '⚡ Connexion…';
+  bar.className = 'fts-bar fts-loading'; lbl.textContent = 'chargement…';
+  try {
+    const token = await getToken();
+    // Chargement DA EXPEDIEES
+    btn.textContent = '⚡ DA Expédiées…';
+    lbl.textContent = 'DA Expédiées…';
+    const daBuffer = await fetchGraphBinary(DA_SHARE_URL, DA_FILE_PATH, token);
+    processDABuffer(daBuffer, 'DA EXPEDIEES 2025.xlsm');
+    // Chargement EXPORT LORANG
+    btn.textContent = '⚡ Export Lorang…';
+    lbl.textContent = 'Export Lorang SAP…';
+    const sapBuffer = await fetchGraphBinary(SAP_SHARE_URL, SAP_FILE_PATH, token);
+    processSAPBuffer(sapBuffer, 'EXPORT LORANG.xlsm');
+    // Lancer l'analyse automatiquement
+    bar.className = 'fts-bar fts-ok';
+    lbl.textContent = `Chargé · ${new Date().toLocaleTimeString('fr-FR')}`;
+    btn.textContent = '⚡ DataFlow';
+    btn.disabled = false;
+    runAnalysis();
+  } catch(e) {
+    console.error('[FlowAnalyse][DataFlow]', e.message);
+    bar.className = 'fts-bar fts-err';
+    lbl.textContent = 'Erreur chargement';
+    btn.textContent = '⚡ DataFlow';
+    btn.disabled = false;
+    alert('Erreur DataFlow : ' + e.message);
+  }
+}
+
+function checkReady() {
+  if (daData && sapData) {
+    document.getElementById('btn-mail').disabled = false;
+    document.getElementById('btn-pdf').disabled = false;
+    document.getElementById('btn-refresh').disabled = false;
+  }
+}
+
+function getISOWeek(d) {
+  if (!(d instanceof Date)) {
+    if (d && d.y) d = new Date(d.y, d.m - 1, d.d);
+    else return 0;
+  }
+  const date = new Date(d.getTime());
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
+  const week1 = new Date(date.getFullYear(), 0, 4);
+  return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+}
+
+// ═══════════════════════════════════════════════
+// ANALYSIS ENGINE
+// ═══════════════════════════════════════════════
+function runAnalysis() {
+  if (!daData || !sapData) {
+    alert('Veuillez charger les deux fichiers avant de lancer l\'analyse.');
+    return;
+  }
+  // Feedback visuel sur le bouton Rafraîchir
+  const btnRefresh = document.getElementById('btn-refresh');
+  btnRefresh.classList.add('spinning');
+
+  const yearFilters = getMultiValues('year');
+  const weekFilters = getMultiValues('week');
+  const confirmedMonthFilters = getMultiValues('month-confirmed');
+  const forecastMonthFilters = getMultiValues('month-forecast');
+  const siteFilters = getMultiValues('site');
+  const paysFilters = getMultiValues('pays');
+  const incoFilters = getMultiValues('inco');
+  const transporteurFilters = getMultiValues('transporteur');
+
+  const yearLabel = getMultiLabel('year', 'Toutes années');
+  const weekLabel = getMultiLabel('week', 'Toutes semaines');
+  const confirmedMonthLabel = getMultiLabel('month-confirmed', 'Tous mois');
+  const forecastMonthLabel = getMultiLabel('month-forecast', 'Tous mois');
+  const confirmedPeriodLabel = `${weekLabel} · ${confirmedMonthLabel} · ${yearLabel}`;
+  const forecastPeriodLabel = `${forecastMonthLabel} · ${yearLabel}`;
+
+  // ── CONFIRMED : DA selon semaines/mois sélectionnés ──
+  const daWeek = daData.filter(r =>
+    r.DATE instanceof Date &&
+    matchSelected(r.DATE.getFullYear(), yearFilters) &&
+    matchSelected(r.SEMAINE, weekFilters) &&
+    matchSelected(r.DATE.getMonth() + 1, confirmedMonthFilters) &&
+    matchSelected(r.EXPEDITEUR, siteFilters) &&
+    matchSelected(r.PAYS, paysFilters) &&
+    matchSelected(r.INCOTERME, incoFilters) &&
+    matchSelected(r.TRANSPORTEUR, transporteurFilters)
+  );
+
+  // Dédupliq par DA pour les comptages
+  const daMap = {};
+  daWeek.forEach(r => {
+    if (!daMap[r.DA]) daMap[r.DA] = r;
+  });
+  const daUniq = Object.values(daMap);
+
+  // DA confirmées par mois : même périmètre de filtres que l'activité confirmée, hors filtre semaine
+  const daMonthlyRaw = daData.filter(r =>
+    r.DATE instanceof Date &&
+    matchSelected(r.DATE.getFullYear(), yearFilters) &&
+    matchSelected(r.DATE.getMonth() + 1, confirmedMonthFilters) &&
+    matchSelected(r.EXPEDITEUR, siteFilters) &&
+    matchSelected(r.PAYS, paysFilters) &&
+    matchSelected(r.INCOTERME, incoFilters) &&
+    matchSelected(r.TRANSPORTEUR, transporteurFilters)
+  );
+  const daMonthlyMap = {};
+  daMonthlyRaw.forEach(r => {
+    if (!daMonthlyMap[r.DA]) daMonthlyMap[r.DA] = r;
+  });
+  const monthlyDA = Array(12).fill(0);
+  Object.values(daMonthlyMap).forEach(r => {
+    monthlyDA[r.DATE.getMonth()] += 1;
+  });
+
+  const totalDA = daUniq.length;
+  const totalT = daUniq.reduce((s, r) => s + r.TONNES, 0);
+  const cipDA = daUniq.filter(r => r.INCOTERME === 'CIP');
+  const fcaDA = daUniq.filter(r => r.INCOTERME === 'FCA');
+  const cipT = cipDA.reduce((s, r) => s + r.TONNES, 0);
+  const fcaT = fcaDA.reduce((s, r) => s + r.TONNES, 0);
+
+  const stdDA = daUniq.filter(r => !r.REMORQUE.includes('EXTENSIBLE') && !r.REMORQUE.includes('DBLE'));
+  const extDA = daUniq.filter(r => r.REMORQUE.includes('EXTENSIBLE') && !r.REMORQUE.includes('DBLE'));
+  const avgStd = stdDA.length ? stdDA.reduce((s,r) => s+r.TONNES,0)/stdDA.length : 0;
+  const avgExt = extDA.length ? extDA.reduce((s,r) => s+r.TONNES,0)/extDA.length : 0;
+
+  // Par site
+  const bySite = {};
+  daUniq.forEach(r => {
+    const s = r.EXPEDITEUR;
+    if (!bySite[s]) bySite[s] = { cip:0, fca:0, total:0, tonnes:0 };
+    bySite[s].total++;
+    bySite[s].tonnes += r.TONNES;
+    if (r.INCOTERME === 'CIP') bySite[s].cip++;
+    else bySite[s].fca++;
+  });
+
+  // Par jour — utiliser les composantes locales pour éviter le décalage UTC
+  const byDay = {};
+  daUniq.forEach(r => {
+    const d = r.DATE;
+    const k = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    byDay[k] = (byDay[k] || 0) + 1;
+  });
+
+  // Par pays
+  const byPays = {};
+  daUniq.forEach(r => {
+    if (!byPays[r.PAYS]) byPays[r.PAYS] = { da:0, tonnes:0 };
+    byPays[r.PAYS].da++;
+    byPays[r.PAYS].tonnes += r.TONNES;
+  });
+
+  // Par remorque
+  const byRem = {};
+  daUniq.forEach(r => {
+    const k = normalizeRemorque(r.REMORQUE);
+    if (!byRem[k]) byRem[k] = { da:0, tonnes:0 };
+    byRem[k].da++;
+    byRem[k].tonnes += r.TONNES;
+  });
+
+  // ── FORECAST : SAP selon mois sélectionnés ──
+  const sapMonth = sapData.filter(r =>
+    matchSelected(r.Mois, forecastMonthFilters) &&
+    matchSelected(r.Annee, yearFilters) &&
+    matchSelected(r.Site, siteFilters) &&
+    matchSelected(r.Pays, paysFilters) &&
+    matchSelected(r.INCO, incoFilters)
+  );
+  const totalSapT = sapMonth.reduce((s,r) => s+r.TO, 0);
+  const cipSapT = sapMonth.filter(r=>r.INCO==='CIP').reduce((s,r)=>s+r.TO,0);
+  const fcaSapT = sapMonth.filter(r=>r.INCO==='FCA').reduce((s,r)=>s+r.TO,0);
+
+  // Par semaine forecast
+  const bySemFc = {};
+  sapMonth.forEach(r => {
+    if (!bySemFc[r.Semaine]) bySemFc[r.Semaine] = { cip:0, fca:0 };
+    if (r.INCO === 'CIP') bySemFc[r.Semaine].cip += r.TO;
+    else bySemFc[r.Semaine].fca += r.TO;
+  });
+
+  // Par pays forecast
+  const byPaysFc = {};
+  sapMonth.forEach(r => {
+    if (!byPaysFc[r.Pays]) byPaysFc[r.Pays] = 0;
+    byPaysFc[r.Pays] += r.TO;
+  });
+
+  // Par site forecast
+  const bySiteFc = {};
+  sapMonth.forEach(r => {
+    if (!bySiteFc[r.Site]) bySiteFc[r.Site] = 0;
+    bySiteFc[r.Site] += r.TO;
+  });
+
+  // Type véhicule forecast
+  const extFcT = sapMonth.filter(r=>r.Lg/1000>15.1).reduce((s,r)=>s+r.TO,0);
+  const stdFcT = sapMonth.filter(r=>r.Lg/1000<=15.1).reduce((s,r)=>s+r.TO,0);
+
+  // Codes 2 CIP
+  const codes2all = sapMonth.filter(r => r.Code === 2);
+  const byOrder = {};
+  codes2all.forEach(r => {
+    const key = `${r.Order}|${r.Semaine}|${r.Site}|${r.Ville}|${r.INCO}`;
+    if (!byOrder[key]) byOrder[key] = { order:r.Order, sem:r.Semaine, site:r.Site, pays:r.Pays, ville:r.Ville, inco:r.INCO, to:0, lgSum:0, lgCount:0 };
+    byOrder[key].to += r.TO;
+    byOrder[key].lgSum += r.Lg;
+    byOrder[key].lgCount++;
+  });
+  const codes2list = Object.values(byOrder);
+  const c2cipT = codes2list.filter(r=>r.inco==='CIP').reduce((s,r)=>s+r.to,0);
+  const c2fcaT = codes2list.filter(r=>r.inco==='FCA').reduce((s,r)=>s+r.to,0);
+
+  analysisResult = {
+    week: weekLabel,
+    weekValues: weekFilters,
+    year: yearLabel,
+    yearValues: yearFilters,
+    month: forecastMonthFilters.length === 1 ? +forecastMonthFilters[0] : 0,
+    monthValues: forecastMonthFilters,
+    monthLabel: forecastMonthLabel,
+    confirmedMonthLabel,
+    forecastMonthLabel,
+    confirmedPeriodLabel,
+    forecastPeriodLabel,
+    totalSapLines: sapMonth.length,
+    totalDA, totalT, cipDA: cipDA.length, fcaDA: fcaDA.length, cipT, fcaT,
+    avgStd, avgExt, monthlyDA,
+    bySite, byDay, byPays, byRem,
+    totalSapT, cipSapT, fcaSapT,
+    bySemFc, byPaysFc, bySiteFc, extFcT, stdFcT,
+    codes2list, c2cipT, c2fcaT
+  };
+
+  renderReport(analysisResult);
+  document.getElementById('btn-pdf').disabled = false;
+  document.getElementById('btn-mail').disabled = false;
+  document.getElementById('btn-refresh').disabled = false;
+  // Fin animation
+  setTimeout(() => document.getElementById('btn-refresh').classList.remove('spinning'), 300);
+}
+
+function normalizeRemorque(r) {
+  r = r || '';
+  if (r.includes('WAGON')) return 'Wagon EXT (erreur SAP = Standard)';
+  if (r.includes('DBLE') || r.includes('DOUBLE')) return 'Double extensible';
+  if (r.includes('EXTENSIBLE')) return 'Extensible';
+  if (r.includes('TAUTLINER')) return 'Tautliner';
+  if (r.includes('FLATBED')) return 'Flatbed';
+  if (r.includes('TRUCK')) return 'Standard (Truck)';
+  return r || 'Autre';
+}
+
+// ═══════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════
+function renderReport(d) {
+  const { week, year } = d;
+  const monthLabel = d.forecastMonthLabel || (d.month ? MONTHS_FR[d.month] : 'Tous mois');
+  const confirmedPeriodLabel = d.confirmedPeriodLabel || `${week} · ${year}`;
+  const forecastPeriodLabel = d.forecastPeriodLabel || `${monthLabel} · ${year}`;
+
+  // Alerts confirmed
+  let alertsHtml = '';
+  Object.entries(d.bySite).forEach(([site, v]) => {
+    const label = SITE_MAP[site] || site;
+    if (v.fca > v.cip) {
+      alertsHtml += `<div class="alert">⚠️ <strong>${label} (${site}) :</strong> FCA (${v.fca} DA) &gt; CIP (${v.cip} DA) — déséquilibre incoterms.</div>`;
+    }
+  });
+  // Alert S19 si FCA > CIP
+  Object.entries(d.bySemFc).forEach(([sem, v]) => {
+    if (v.fca > v.cip) {
+      alertsHtml += `<div class="alert alert-warn">⚠️ Forecast S${sem} : FCA (${fmt(v.fca)} T) &gt; CIP (${fmt(v.cip)} T)</div>`;
+    }
+  });
+
+  // Jours chargement
+  const days = Object.entries(d.byDay).sort(([a],[b])=>a.localeCompare(b));
+  // Max 5 jours
+  let daysHtml = '';
+  days.forEach(([dateStr, count]) => {
+    // Parser en heure locale pour éviter le décalage UTC (ex: "2026-05-04T12:00:00" au lieu de "2026-05-04")
+    const dt = new Date(dateStr + 'T12:00:00');
+    const dayLabel = `${DAYS_FR[dt.getDay()]} ${dt.getDate().toString().padStart(2,'0')}/${(dt.getMonth()+1).toString().padStart(2,'0')}`;
+    daysHtml += `<div class="day-card"><div class="day-name">${dayLabel}</div><div class="day-val">${count}</div><div class="day-sub">DA</div></div>`;
+  });
+  const dayGrid = days.length <= 4 ? 'grid-template-columns:repeat(4,1fr)' : 'grid-template-columns:repeat(5,1fr)';
+
+  // Sites
+  const sitesHtml = Object.entries(d.bySite).map(([site, v]) => {
+    const label = SITE_MAP[site] || site;
+    const warn = v.fca > v.cip;
+    return `<tr>
+      <td><strong>${label}</strong> <span class="badge badge-blue">${site}</span></td>
+      <td>${v.cip}</td>
+      <td>${warn ? `<span class="badge badge-danger">${v.fca}</span>` : v.fca}</td>
+      <td>${v.total}</td>
+      <td>${fmt(v.tonnes)} T</td>
+    </tr>`;
+  }).join('');
+
+  // Remorques
+  const remHtml = Object.entries(d.byRem).sort(([,a],[,b])=>b.da-a.da).map(([type, v]) => {
+    return `<tr><td>${type}</td><td>${v.da}</td><td>${fmt(v.tonnes)} T</td></tr>`;
+  }).join('');
+
+  // Pays confirmed - barres
+  const paysSorted = Object.entries(d.byPays).sort(([,a],[,b])=>b.da-a.da);
+  const maxPays = paysSorted[0]?.[1]?.da || 1;
+  const paysHtml = paysSorted.map(([pays, v]) => {
+    const pct = Math.round(v.da / maxPays * 100);
+    return `<div class="bar-row">
+      <span class="bar-name">${pays}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+      <span class="bar-val">${v.da} DA · ${fmt(v.tonnes)} T</span>
+    </div>`;
+  }).join('');
+
+  // Forecast par semaine
+  const semKeys = Object.keys(d.bySemFc).map(Number).sort((a,b)=>a-b);
+  const semHtml = semKeys.map(sem => {
+    const v = d.bySemFc[sem];
+    const total = v.cip + v.fca;
+    const cipPct = Math.round(v.cip/total*100);
+    const status = v.fca > v.cip ? '<span class="badge badge-warn">FCA &gt; CIP</span>' : '<span class="badge badge-ok">CIP dominant</span>';
+    return `<div class="sem-block">
+      <div class="sem-header">
+        <span class="sem-title">S${sem} — ${fmt(total)} T</span>
+        ${status}
+      </div>
+      <div class="sem-bar-wrap">
+        <div class="sem-cip" style="width:${cipPct}%"></div>
+        <div class="sem-fca" style="width:${100-cipPct}%"></div>
+      </div>
+      <div class="sem-meta">
+        <span><div class="dot-cip"></div> CIP ${fmt(v.cip)} T</span>
+        <span><div class="dot-fca"></div> FCA ${fmt(v.fca)} T</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Pays forecast barres
+  const paysFcSorted = Object.entries(d.byPaysFc).sort(([,a],[,b])=>b-a);
+  const maxPaysFc = paysFcSorted[0]?.[1] || 1;
+  const paysFcHtml = paysFcSorted.map(([pays, t]) => {
+    const pct = Math.round(t/maxPaysFc*100);
+    const pctLabel = d.totalSapT ? Math.round(t/d.totalSapT*100) : 0;
+    return `<div class="bar-row">
+      <span class="bar-name">${pays}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+      <span class="bar-val">${fmt(t)} T · ${pctLabel}%</span>
+    </div>`;
+  }).join('');
+
+  // Sites forecast
+  const siteFcHtml = Object.entries(d.bySiteFc).sort(([,a],[,b])=>b-a).map(([site,t]) => {
+    const label = SITE_MAP[site] || site;
+    const pct = d.totalSapT ? Math.round(t/d.totalSapT*100) : 0;
+    return `<tr><td><strong>${label}</strong> <span class="badge badge-blue">${site}</span></td><td>${fmt(t)} T</td><td>${pct}%</td></tr>`;
+  }).join('');
+
+  // Répartition par pays — Codes 2
+  const byPaysC2 = {};
+  d.codes2list.forEach(r => {
+    if (!byPaysC2[r.pays]) byPaysC2[r.pays] = 0;
+    byPaysC2[r.pays] += r.to;
+  });
+  const paysC2Sorted = Object.entries(byPaysC2).sort(([,a],[,b])=>b-a);
+  const totalC2T = d.c2cipT + d.c2fcaT;
+  const c2ChartId = 'chart-c2-pays-' + Date.now();
+  const monthlyChartId = 'chart-da-monthly-' + Date.now();
+
+  const C2_PALETTE = [
+    '#004D8C','#E63530','#67D848','#F5831F','#A020F0',
+    '#00B4D8','#FFD600','#E91E8C','#00897B','#FF6B35',
+    '#1565C0','#558B2F','#C62828','#4527A0','#00838F'
+  ];
+
+  // Codes 2 CIP + FCA par semaine
+  const c2BySem = {};
+  d.codes2list.forEach(r => {
+    if (!c2BySem[r.sem]) c2BySem[r.sem] = { cip:[], fca:[] };
+    r.inco === 'CIP' ? c2BySem[r.sem].cip.push(r) : c2BySem[r.sem].fca.push(r);
+  });
+  let codes2Html = '';
+  Object.keys(c2BySem).map(Number).sort((a,b)=>a-b).forEach(sem => {
+    const { cip, fca } = c2BySem[sem];
+    const semT = [...cip,...fca].reduce((s,r)=>s+r.to,0);
+    codes2Html += `<div style="margin-bottom:16px"><p style="font-size:12px;font-weight:600;color:var(--am-navy);margin:0 0 8px;">S${sem} <span style="font-weight:400;color:#8AA0B8">${fmt(semT)} T total</span></p>`;
+    if (cip.length) {
+      codes2Html += `<p style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#2E7D32;margin:0 0 4px;padding:3px 8px;background:#E8F5E9;border-radius:4px;display:inline-block">✅ CIP — ${fmt(cip.reduce((s,r)=>s+r.to,0))} T</p>`;
+      codes2Html += cip.map(r => {
+        const lgM = r.lgCount ? r.lgSum/r.lgCount : 0;
+        return `<div class="order-row"><span class="order-num">${r.order}</span><span class="order-info"><span class="order-from">${SITE_MAP[r.site]||r.site} (${r.site})</span> → ${r.pays} · ${r.ville}<span class="tag tag-${lgM>15.1?'ext':'std'}">${lgM>15.1?'Extensible':'Standard'}</span><br>${fmt(r.to)} T · long. moy. ${fmt(lgM)} m</span></div>`;
+      }).join('');
+    }
+    if (fca.length) {
+      codes2Html += `<p style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#8a6000;margin:8px 0 4px;padding:3px 8px;background:#FFF8E1;border-radius:4px;display:inline-block">⚠️ FCA — ${fmt(fca.reduce((s,r)=>s+r.to,0))} T (transporteur imposé client)</p>`;
+      codes2Html += fca.map(r => {
+        const lgM = r.lgCount ? r.lgSum/r.lgCount : 0;
+        return `<div class="order-row" style="opacity:.8"><span class="order-num">${r.order}</span><span class="order-info"><span class="order-from">${SITE_MAP[r.site]||r.site} (${r.site})</span> → ${r.pays} · ${r.ville}<span class="tag tag-${lgM>15.1?'ext':'std'}">${lgM>15.1?'Extensible':'Standard'}</span><br>${fmt(r.to)} T · long. moy. ${fmt(lgM)} m</span></div>`;
+      }).join('');
+    }
+    codes2Html += '</div>';
+  });
+
+  const html = `
+  <!-- CONFIRMED -->
+  <div class="section-header">
+    <div class="section-dot"></div>
+    <h2>Activité confirmée — ${confirmedPeriodLabel}</h2>
+    <div class="line"></div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">DA chargées</div>
+      <div class="kpi-value">${d.totalDA}</div>
+      <div class="kpi-sub">${confirmedPeriodLabel}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Tonnage expédié</div>
+      <div class="kpi-value">${fmt(d.totalT)} T</div>
+      <div class="kpi-sub">CIP ${fmt(d.cipT)} · FCA ${fmt(d.fcaT)}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Poids moyen STD</div>
+      <div class="kpi-value">${fmt(d.avgStd)} T</div>
+      <div class="kpi-sub">EXT : ${fmt(d.avgExt)} T</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Ratio CIP cellule</div>
+      <div class="kpi-value">${d.totalDA ? Math.round(d.cipDA/d.totalDA*100) : 0}%</div>
+      <div class="kpi-sub">${d.cipDA} CIP / ${d.totalDA} DA</div>
+    </div>
+  </div>
+
+  ${alertsHtml}
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">Par site · Incoterm</div>
+      <table class="tbl">
+        <thead><tr><th>Site</th><th>CIP</th><th>FCA</th><th>Total</th><th>Tonnage</th></tr></thead>
+        <tbody>${sitesHtml}</tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-title">Répartition remorques</div>
+      <table class="tbl">
+        <thead><tr><th>Type</th><th>DA</th><th>Tonnage</th></tr></thead>
+        <tbody>${remHtml}</tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-title">Chargements par jour</div>
+    <div class="day-grid" style="${dayGrid}">${daysHtml}</div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-title">Pays — DA confirmées</div>
+    ${paysHtml}
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-title">DA confirmées par mois</div>
+    <div class="chart-wrap" style="height:260px">
+      <canvas id="${monthlyChartId}"></canvas>
+    </div>
+  </div>
+
+  <!-- FORECAST -->
+  <div class="section-header">
+    <div class="section-dot"></div>
+    <h2>Forecast ${forecastPeriodLabel} — SAP en attente</h2>
+    <div class="line"></div>
+  </div>
+
+  <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+    <div class="kpi-card">
+      <div class="kpi-label">Tonnage total ${monthLabel}</div>
+      <div class="kpi-value">${fmt(d.totalSapT)} T</div>
+      <div class="kpi-sub">${d.totalSapLines} lignes SAP</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Volume CIP</div>
+      <div class="kpi-value">${fmt(d.cipSapT)} T</div>
+      <div class="kpi-sub">${d.totalSapT ? Math.round(d.cipSapT/d.totalSapT*100) : 0}% du volume</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Volume FCA</div>
+      <div class="kpi-value">${fmt(d.fcaSapT)} T</div>
+      <div class="kpi-sub">${d.totalSapT ? Math.round(d.fcaSapT/d.totalSapT*100) : 0}% du volume</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-title">Volume par semaine — CIP vs FCA</div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--am-navy)"></div> CIP (cellule)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--am-amber)"></div> FCA (client)</div>
+    </div>
+    ${semHtml}
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">Pays — Forecast ${monthLabel}</div>
+      ${paysFcHtml}
+    </div>
+    <div class="card">
+      <div class="card-title">Sites expéditeurs — Forecast ${monthLabel}</div>
+      <table class="tbl">
+        <thead><tr><th>Site</th><th>Tonnage</th><th>%</th></tr></thead>
+        <tbody>${siteFcHtml}</tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- CODES 2 -->
+  <div class="section-header">
+    <div class="section-dot" style="background:var(--am-red)"></div>
+    <h2 style="color:var(--am-red)">Codes 2 — ${forecastPeriodLabel} · CIP &amp; FCA</h2>
+    <div class="line"></div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;gap:12px;margin-bottom:14px">
+      <div style="flex:1;background:#E8F5E9;border-radius:8px;padding:10px 14px"><div style="font-size:11px;color:#2E7D32;font-weight:600;margin-bottom:2px">✅ CIP — Géré cellule</div><div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:500;color:#1B5E20">${fmt(d.c2cipT)} T</div></div>
+      <div style="flex:1;background:#FFF8E1;border-radius:8px;padding:10px 14px"><div style="font-size:11px;color:#8a6000;font-weight:600;margin-bottom:2px">⚠️ FCA — Transporteur client</div><div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:500;color:#8a6000">${fmt(d.c2fcaT)} T</div></div>
+      <div style="flex:1;background:var(--bg);border-radius:8px;padding:10px 14px;border:1px solid var(--border)"><div style="font-size:11px;color:var(--text-muted);font-weight:600;margin-bottom:2px">Total Code 2</div><div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:500;color:var(--am-navy)">${fmt(d.c2cipT+d.c2fcaT)} T</div></div>
+    </div>
+
+    <!-- Graphique répartition pays C2 -->
+    <div style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:16px">
+      <div class="card-title" style="margin-bottom:12px">Répartition par pays — Codes 2 ${forecastPeriodLabel}</div>
+      <div style="display:flex;gap:16px;align-items:center">
+        <div style="width:180px;height:180px;flex-shrink:0">
+          <canvas id="${c2ChartId}"></canvas>
+        </div>
+        <div style="flex:1">
+          ${paysC2Sorted.map(([pays, t], i) => {
+            const pct = totalC2T ? Math.round(t / totalC2T * 100) : 0;
+            const barPct = Math.round(t / (paysC2Sorted[0][1]) * 100);
+            const color = C2_PALETTE[i % C2_PALETTE.length];
+            return `<div class="bar-row" style="margin:4px 0">
+              <span style="display:inline-flex;align-items:center;gap:5px;min-width:52px;font-size:11px;font-weight:600;color:var(--text-primary)">
+                <span style="width:10px;height:10px;border-radius:2px;background:${color};flex-shrink:0;display:inline-block"></span>
+                ${pays}
+              </span>
+              <div class="bar-track"><div class="bar-fill" style="width:${barPct}%;background:${color}"></div></div>
+              <span class="bar-val" style="min-width:160px;text-align:right;font-size:11px">${fmt(t)} T · <strong>${pct}%</strong></span>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+
+    ${codes2Html}
+  </div>
+  `;
+
+  document.getElementById('report').innerHTML = html;
+
+  // ── Graphique DA confirmées par mois ──
+  const monthlyCanvas = document.getElementById(monthlyChartId);
+  if (monthlyCanvas) {
+    const monthlyCtx = monthlyCanvas.getContext('2d');
+    const monthlyValues = d.monthlyDA || Array(12).fill(0);
+    const monthlyMax = Math.max(...monthlyValues, 0);
+
+    // Plugin léger pour afficher les valeurs directement au-dessus des barres
+    const monthlyValueLabelsPlugin = {
+      id: 'monthlyValueLabels',
+      afterDatasetsDraw(chart) {
+        const { ctx } = chart;
+        const dataset = chart.data.datasets[0];
+        const meta = chart.getDatasetMeta(0);
+        ctx.save();
+        ctx.font = "600 11px 'DM Sans', sans-serif";
+        ctx.fillStyle = '#0D1B2A';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        meta.data.forEach((bar, index) => {
+          const value = Number(dataset.data[index] || 0);
+          if (value <= 0) return;
+          ctx.fillText(value.toLocaleString('fr-FR'), bar.x, bar.y - 6);
+        });
+        ctx.restore();
+      }
+    };
+
+    new Chart(monthlyCtx, {
+      type: 'bar',
+      data: {
+        labels: MONTHS_FR.slice(1),
+        datasets: [{
+          label: 'DA confirmées',
+          data: monthlyValues,
+          backgroundColor: '#0066B3',
+          borderRadius: 5,
+          maxBarThickness: 42,
+          clip: false
+        }]
+      },
+      plugins: [monthlyValueLabelsPlugin],
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: { padding: { top: 24 } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${ctx.parsed.y} DA confirmées`
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { color: '#4A6080', maxRotation: 45, minRotation: 0 }
+          },
+          y: {
+            beginAtZero: true,
+            suggestedMax: monthlyMax > 0 ? monthlyMax + Math.ceil(monthlyMax * 0.15) : 5,
+            ticks: { color: '#4A6080', precision: 0 },
+            grid: { color: '#E8EFF6' }
+          }
+        }
+      }
+    });
+  }
+
+  // ── Graphique pays Codes 2 ──
+  if (paysC2Sorted.length > 0) {
+    const ctx = document.getElementById(c2ChartId).getContext('2d');
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: paysC2Sorted.map(([pays]) => pays),
+        datasets: [{
+          data: paysC2Sorted.map(([,t]) => Math.round(t * 10) / 10),
+          backgroundColor: paysC2Sorted.map((_, i) => C2_PALETTE[i % C2_PALETTE.length]),
+          borderWidth: 2,
+          borderColor: '#fff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        cutout: '62%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => {
+                const val = ctx.parsed;
+                const pct = totalC2T ? Math.round(val / totalC2T * 100) : 0;
+                return ` ${fmt(val)} T · ${pct}%`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  setupVisualPopups();
+}
+
+
+// ═══════════════════════════════════════════════
+// AFFICHAGE DA
+// ═══════════════════════════════════════════════
+const DA_DISPLAY_DYNAMIC_IDS = ['da-display-transporteur', 'da-display-pays', 'da-display-ville'];
+
+function dateToKeyLocal(date) {
+  if (!(date instanceof Date) || isNaN(date)) return '';
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function formatDateFR(date) {
+  if (!(date instanceof Date) || isNaN(date)) return '';
+  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+}
+
+function getDaDisplayGlobalContextRows() {
+  if (!daData) return [];
+  const yearFilters = getMultiValues('year');
+  const weekFilters = getMultiValues('week');
+  const confirmedMonthFilters = getMultiValues('month-confirmed');
+  const siteFilters = getMultiValues('site');
+  const incoFilters = getMultiValues('inco');
+
+  return daData.filter(r =>
+    r.DATE instanceof Date &&
+    matchSelected(r.DATE.getFullYear(), yearFilters) &&
+    matchSelected(r.SEMAINE, weekFilters) &&
+    matchSelected(r.DATE.getMonth() + 1, confirmedMonthFilters) &&
+    matchSelected(r.EXPEDITEUR, siteFilters) &&
+    matchSelected(r.INCOTERME, incoFilters)
+  );
+}
+
+function uniqSorted(rows, field) {
+  return [...new Set(rows.map(r => r[field]).filter(v => v !== null && v !== undefined && String(v).trim() !== '').map(v => String(v).trim()))]
+    .sort((a, b) => a.localeCompare(b, 'fr', { numeric: true }));
+}
+
+function getDaDisplayDependentRows() {
+  if (!daData) return [];
+  const selectedDA = getMultiValues('da-display-da');
+  const selectedSAP = getMultiValues('da-display-sap');
+
+  if (selectedDA.length || selectedSAP.length) {
+    return daData.filter(r =>
+      matchSelected(r.DA, selectedDA) &&
+      matchSelected(r.SAP, selectedSAP)
+    );
+  }
+
+  // Sans DA définie, les listes Transporteur/Pays/Ville reprennent le contexte semaine/mois confirmé.
+  return getDaDisplayGlobalContextRows();
+}
+
+function refreshDaDisplayDynamicChoices() {
+  const rows = getDaDisplayDependentRows();
+  const mapping = {
+    'da-display-transporteur': 'TRANSPORTEUR',
+    'da-display-pays': 'PAYS',
+    'da-display-ville': 'VILLE'
+  };
+  Object.entries(mapping).forEach(([id, field]) => {
+    populateMultiFilter(id, uniqSorted(rows, field), null);
+    bindDaDisplayReactive(id);
+  });
+}
+
+function bindDaDisplayReactive(id) {
+  const root = document.getElementById(`mf-${id}`);
+  if (!root || root.dataset.daDisplayBound === '1') return;
+  root.dataset.daDisplayBound = '1';
+  root.addEventListener('change', () => {
+    if (id === 'da-display-da' || id === 'da-display-sap') {
+      refreshDaDisplayDynamicChoices();
+    }
+    renderDaDisplayResults();
+  });
+}
+
+function prepareDaDisplayFilters() {
+  if (!daData) return;
+
+  populateMultiFilter('da-display-da', uniqSorted(daData, 'DA'), null);
+  populateMultiFilter('da-display-sap', uniqSorted(daData, 'SAP'), null);
+  bindDaDisplayReactive('da-display-da');
+  bindDaDisplayReactive('da-display-sap');
+  refreshDaDisplayDynamicChoices();
+  updateDaDateMode();
+}
+
+function openDaDisplay() {
+  if (!daData) {
+    alert('Veuillez d’abord charger le classeur DA Expédiées 2025.');
+    return;
+  }
+  prepareDaDisplayFilters();
+  renderDaDisplayResults();
+  const modal = document.getElementById('da-display-modal');
+  if (!modal) return;
+  modal.classList.add('visible');
+  modal.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('modal-open');
+}
+
+function closeDaDisplay(evt) {
+  if (evt && evt.target && evt.target.closest && evt.target.closest('.da-display-panel')) return;
+  const modal = document.getElementById('da-display-modal');
+  if (!modal) return;
+  modal.classList.remove('visible');
+  modal.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('modal-open');
+  document.querySelectorAll('#da-display-modal .multi-filter.open').forEach(el => el.classList.remove('open'));
+}
+
+function updateDaDateMode() {
+  const mode = document.getElementById('da-display-date-mode')?.value || '';
+  const fixed = document.getElementById('da-display-date-fixed');
+  const range = document.getElementById('da-display-date-range');
+  if (fixed) fixed.style.display = mode === 'fixed' ? '' : 'none';
+  if (range) range.style.display = mode === 'range' ? '' : 'none';
+}
+
+function resetDaDisplay() {
+  ['da-display-da', 'da-display-sap', 'da-display-transporteur', 'da-display-pays', 'da-display-ville'].forEach(id => {
+    if (filterState[id]) filterState[id].selected.clear();
+    updateMultiSummary(id);
+  });
+  const mode = document.getElementById('da-display-date-mode');
+  const fixed = document.getElementById('da-display-date-fixed');
+  const start = document.getElementById('da-display-date-start');
+  const end = document.getElementById('da-display-date-end');
+  if (mode) mode.value = '';
+  if (fixed) fixed.value = '';
+  if (start) start.value = '';
+  if (end) end.value = '';
+  updateDaDateMode();
+  refreshDaDisplayDynamicChoices();
+  renderDaDisplayResults();
+}
+
+function applyDaDisplayDateFilter(rows) {
+  const mode = document.getElementById('da-display-date-mode')?.value || '';
+  if (!mode) return rows;
+
+  if (mode === 'fixed') {
+    const fixed = document.getElementById('da-display-date-fixed')?.value || '';
+    if (!fixed) return rows;
+    return rows.filter(r => dateToKeyLocal(r.DATE) === fixed);
+  }
+
+  if (mode === 'range') {
+    const start = document.getElementById('da-display-date-start')?.value || '';
+    const end = document.getElementById('da-display-date-end')?.value || '';
+    return rows.filter(r => {
+      const key = dateToKeyLocal(r.DATE);
+      if (!key) return false;
+      if (start && key < start) return false;
+      if (end && key > end) return false;
+      return true;
+    });
+  }
+
+  return rows;
+}
+
+function aggregateDaDisplayRows(rows) {
+  const map = {};
+  rows.forEach(r => {
+    const key = String(r.DA || '').trim() || `__NO_DA__${Object.keys(map).length}`;
+    if (!map[key]) {
+      map[key] = {
+        ...r,
+        KG: +r.KG || 0,
+        TONNES: +r.TONNES || 0,
+        _transporteurs: new Set([r.TRANSPORTEUR].filter(Boolean)),
+        _pays: new Set([r.PAYS].filter(Boolean)),
+        _villes: new Set([r.VILLE].filter(Boolean))
+      };
+    } else {
+      map[key].KG += +r.KG || 0;
+      map[key].TONNES += +r.TONNES || 0;
+      if (r.TRANSPORTEUR) map[key]._transporteurs.add(r.TRANSPORTEUR);
+      if (r.PAYS) map[key]._pays.add(r.PAYS);
+      if (r.VILLE) map[key]._villes.add(r.VILLE);
+    }
+  });
+  return Object.values(map).map(r => ({
+    ...r,
+    TRANSPORTEUR: [...r._transporteurs].join(', '),
+    PAYS: [...r._pays].join(', '),
+    VILLE: [...r._villes].join(', ')
+  })).sort((a, b) => {
+    const daCmp = String(a.DA || '').localeCompare(String(b.DA || ''), 'fr', { numeric: true });
+    if (daCmp !== 0) return daCmp;
+    return (a.DATE || 0) - (b.DATE || 0);
+  });
+}
+
+function renderDaDisplayResults() {
+  const countEl = document.getElementById('da-display-count');
+  const contextEl = document.getElementById('da-display-context');
+  const resultEl = document.getElementById('da-display-results');
+  if (!countEl || !contextEl || !resultEl) return;
+
+  if (!daData) {
+    countEl.textContent = '0 DA';
+    contextEl.textContent = 'Aucun classeur DA chargé.';
+    resultEl.innerHTML = '<div class="da-display-empty">Charge d’abord le classeur DA Expédiées 2025.</div>';
+    return;
+  }
+
+  const selectedDA = getMultiValues('da-display-da');
+  const selectedSAP = getMultiValues('da-display-sap');
+  const selectedTransporteurs = getMultiValues('da-display-transporteur');
+  const selectedPays = getMultiValues('da-display-pays');
+  const selectedVilles = getMultiValues('da-display-ville');
+
+  let rows = selectedDA.length || selectedSAP.length
+    ? daData.filter(r => matchSelected(r.DA, selectedDA) && matchSelected(r.SAP, selectedSAP))
+    : getDaDisplayGlobalContextRows();
+
+  rows = rows.filter(r =>
+    matchSelected(r.TRANSPORTEUR, selectedTransporteurs) &&
+    matchSelected(r.PAYS, selectedPays) &&
+    matchSelected(r.VILLE, selectedVilles)
+  );
+
+  rows = applyDaDisplayDateFilter(rows);
+  const aggregated = aggregateDaDisplayRows(rows);
+  const totalT = aggregated.reduce((s, r) => s + (+r.TONNES || 0), 0);
+
+  countEl.textContent = `${aggregated.length} DA`;
+  const contextParts = [];
+  if (!selectedDA.length && !selectedSAP.length) contextParts.push(`Contexte global : ${getMultiLabel('week', 'toutes semaines')} · ${getMultiLabel('month-confirmed', 'tous mois confirmés')} · ${getMultiLabel('year', 'toutes années')}`);
+  else contextParts.push('Contexte : recherche directe par DA/SAP, hors contrainte semaine/mois global');
+  contextParts.push(`Tonnage affiché : ${fmt(totalT)} T`);
+  contextEl.textContent = contextParts.join(' | ');
+
+  if (!aggregated.length) {
+    resultEl.innerHTML = '<div class="da-display-empty">Aucune DA ne correspond aux critères sélectionnés.</div>';
+    return;
+  }
+
+  resultEl.innerHTML = `
+    <div class="da-table-wrap">
+      <table class="da-table">
+        <thead>
+          <tr>
+            <th>DA</th>
+            <th>SAP</th>
+            <th>Transporteur</th>
+            <th>Date</th>
+            <th>Pays</th>
+            <th>Ville</th>
+            <th>Tonnes</th>
+            <th>Remorque</th>
+            <th>Site</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${aggregated.map(r => `
+            <tr>
+              <td class="mono">${escHtml(r.DA || '')}</td>
+              <td class="mono">${escHtml(r.SAP || '')}</td>
+              <td>${escHtml(r.TRANSPORTEUR || '')}</td>
+              <td>${escHtml(formatDateFR(r.DATE))}</td>
+              <td>${escHtml(r.PAYS || '')}</td>
+              <td>${escHtml(r.VILLE || '')}</td>
+              <td class="mono">${fmt(+r.TONNES || 0)}</td>
+              <td>${escHtml(normalizeRemorque(r.REMORQUE || ''))}</td>
+              <td>${escHtml(SITE_MAP[r.EXPEDITEUR] || r.EXPEDITEUR || '')}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+document.addEventListener('keydown', evt => {
+  if (evt.key === 'Escape') closeDaDisplay();
+});
+
+// ═══════════════════════════════════════════════
+// VISUAL POPUP
+// ═══════════════════════════════════════════════
+function setupVisualPopups() {
+  const report = document.getElementById('report');
+  if (!report) return;
+  const visuals = report.querySelectorAll('.card, .kpi-card');
+  visuals.forEach(el => {
+    el.classList.add('zoomable-visual');
+    el.setAttribute('title', 'Cliquer pour agrandir');
+    el.onclick = evt => {
+      if (evt.target.closest('button, select, input, textarea, a, label')) return;
+      evt.stopPropagation();
+      openVisualPopup(el);
+    };
+  });
+}
+
+function openVisualPopup(sourceEl) {
+  const modal = document.getElementById('visual-modal');
+  const body = document.getElementById('visual-modal-body');
+  const title = document.getElementById('visual-modal-title');
+  if (!modal || !body || !sourceEl) return;
+
+  const sourceTitle = sourceEl.querySelector('.card-title')?.textContent?.trim()
+    || sourceEl.querySelector('.kpi-label')?.textContent?.trim()
+    || 'Détail du visuel';
+
+  const clone = sourceEl.cloneNode(true);
+  clone.classList.remove('zoomable-visual');
+  clone.removeAttribute('title');
+  clone.querySelectorAll('.zoomable-visual').forEach(n => n.classList.remove('zoomable-visual'));
+
+  // Les canvas Chart.js ne se dupliquent pas correctement avec cloneNode.
+  // On remplace donc chaque canvas cloné par une image du graphique rendu.
+  const originalCanvas = sourceEl.querySelectorAll('canvas');
+  const clonedCanvas = clone.querySelectorAll('canvas');
+  clonedCanvas.forEach((canvas, index) => {
+    const original = originalCanvas[index];
+    if (!original) return;
+    try {
+      const img = document.createElement('img');
+      img.src = original.toDataURL('image/png');
+      img.alt = sourceTitle;
+      img.className = 'chart-snapshot';
+      canvas.replaceWith(img);
+    } catch (e) {
+      // Si le navigateur refuse l'image, on laisse simplement le canvas cloné.
+    }
+  });
+
+  title.textContent = sourceTitle;
+  body.innerHTML = '';
+  body.appendChild(clone);
+  modal.classList.add('visible');
+  modal.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('modal-open');
+}
+
+function closeVisualPopup(evt) {
+  if (evt && evt.target && evt.target.closest && evt.target.closest('.visual-modal-panel')) return;
+  const modal = document.getElementById('visual-modal');
+  const body = document.getElementById('visual-modal-body');
+  if (!modal) return;
+  modal.classList.remove('visible');
+  modal.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('modal-open');
+  if (body) body.innerHTML = '';
+}
+
+document.addEventListener('keydown', evt => {
+  if (evt.key === 'Escape') closeVisualPopup();
+});
+
+function fmt(n) {
+  if (isNaN(n)) return '0';
+  if (Number.isInteger(n) || Math.abs(n - Math.round(n)) < 0.01) return Math.round(n).toLocaleString('fr-FR');
+  return n.toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
+
+// ═══════════════════════════════════════════════
+// MAIL GENERATOR
+// ═══════════════════════════════════════════════
+function generateMail() {
+  if (!analysisResult) { runAnalysis(); }
+  const d = analysisResult;
+  if (!d) return;
+
+  const { week, year } = d;
+  const monthLabel = d.forecastMonthLabel || (d.month ? MONTHS_FR[d.month] : 'Tous mois');
+  const confirmedPeriodLabel = d.confirmedPeriodLabel || `${week} · ${year}`;
+  const forecastPeriodLabel = d.forecastPeriodLabel || `${monthLabel} · ${year}`;
+
+  // Jours
+  const days = Object.entries(d.byDay).sort(([a],[b])=>a.localeCompare(b));
+  const daysLines = days.map(([dateStr, count]) => {
+    const dt = new Date(dateStr + 'T12:00:00');
+    const dayFull = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'][dt.getDay()];
+    return `  • ${dayFull} ${dt.getDate().toString().padStart(2,'0')}/${(dt.getMonth()+1).toString().padStart(2,'0')} : ${count} DA`;
+  }).join('\n');
+
+  // Sites
+  const sitesLines = Object.entries(d.bySite).map(([site, v]) => {
+    const label = SITE_MAP[site] || site;
+    const fca = v.fca > 0 ? `${v.cip} CIP / ${v.fca} FCA → ` : '';
+    return `  • ${label} (${site}) : ${fca}${v.total} DA / ${fmt(v.tonnes)} T`;
+  }).join('\n');
+
+  // Remorques
+  const remLines = Object.entries(d.byRem).sort(([,a],[,b])=>b.da-a.da).map(([type, v]) => {
+    return `  • ${type} : ${v.da} DA`;
+  }).join('\n');
+
+  // Pays
+  const paysLines = Object.entries(d.byPays).sort(([,a],[,b])=>b.da-a.da).map(([pays, v]) => {
+    return `  • ${pays} : ${v.da} DA / ${fmt(v.tonnes)} T`;
+  }).join('\n');
+
+  // Codes 2 par semaine — CIP + FCA
+  const c2BySem = {};
+  d.codes2list.forEach(r => {
+    if (!c2BySem[r.sem]) c2BySem[r.sem] = { cip:[], fca:[] };
+    r.inco === 'CIP' ? c2BySem[r.sem].cip.push(r) : c2BySem[r.sem].fca.push(r);
+  });
+  let c2Lines = '';
+  Object.keys(c2BySem).map(Number).sort((a,b)=>a-b).forEach(sem => {
+    const { cip, fca } = c2BySem[sem];
+    c2Lines += `\n  S${sem} :\n`;
+    if (cip.length) {
+      c2Lines += `  ✅ CIP (${fmt(cip.reduce((s,r)=>s+r.to,0))} T) :\n`;
+      cip.forEach((r, i) => {
+        const lgM = r.lgCount ? r.lgSum/r.lgCount : 0;
+        c2Lines += `    ${i+1}. ${r.order} — ${SITE_MAP[r.site]||r.site} (${r.site}) → ${r.pays} · ${r.ville}\n`;
+        c2Lines += `       ${lgM>15.1?'Extensible':'Standard'} | ${fmt(r.to)} T | long. moy. ${fmt(lgM)} m\n`;
+      });
+    }
+    if (fca.length) {
+      c2Lines += `  ⚠️ FCA (${fmt(fca.reduce((s,r)=>s+r.to,0))} T — transporteur imposé client) :\n`;
+      fca.forEach((r, i) => {
+        const lgM = r.lgCount ? r.lgSum/r.lgCount : 0;
+        c2Lines += `    ${i+1}. ${r.order} — ${SITE_MAP[r.site]||r.site} (${r.site}) → ${r.pays} · ${r.ville}\n`;
+        c2Lines += `       ${lgM>15.1?'Extensible':'Standard'} | ${fmt(r.to)} T | long. moy. ${fmt(lgM)} m\n`;
+      });
+    }
+  });
+  const totalC2 = d.c2cipT + d.c2fcaT;
+
+  // Alert
+  const alerts = [];
+  Object.entries(d.bySite).forEach(([site, v]) => {
+    if (v.fca > v.cip) alerts.push(`⚠️ ${SITE_MAP[site]||site} : FCA (${v.fca} DA) dépasse le CIP (${v.cip} DA).`);
+  });
+  const alertBlock = alerts.length ? '\n' + alerts.join('\n') + '\n' : '';
+
+  const mail = `Micael,
+
+En compensation de notre point hebdo, tu trouveras ci-dessous l'analyse confirmée ${confirmedPeriodLabel}.
+
+
+• ${d.totalDA} DA chargées | ${fmt(d.totalT)} T expédiées
+• Poids moyen STD : ${fmt(d.avgStd)} T | EXT : ${fmt(d.avgExt)} T
+• Ratio CIP : ${d.totalDA ? Math.round(d.cipDA/d.totalDA*100) : 0} % (${d.cipDA} DA CIP / ${d.totalDA})
+
+Répartition par site :
+
+${sitesLines}
+${alertBlock}
+Répartition remorques :
+
+${remLines}
+
+Chargements par jour :
+
+${daysLines}
+
+Pays :
+
+${paysLines}
+
+──────────────────────────────────────────
+🔴 FORECAST — CODES 2 EN ATTENTE ${forecastPeriodLabel.toUpperCase()}
+──────────────────────────────────────────
+
+${d.codes2list.length} commandes | ✅ CIP ${fmt(d.c2cipT)} T / ⚠️ FCA ${fmt(d.c2fcaT)} T | Total ${fmt(totalC2)} T
+${c2Lines}
+Ces commandes sont en cours de traitement.
+
+Je suis à ta dispo si tu as besoin de plus d'informations.
+
+Jeremy Ducrot
+Cellule 3PL – Lorang & Portmann
+Transports ArcelorMittal Palplanches`;
+
+  document.getElementById('mail-content').textContent = mail;
+  cachedMailTxt = mail;
+  cachedMailHtml = buildMailHTML(d, mail);
+
+  // Reset to current format display
+  const frame = document.getElementById('mail-html-frame');
+  if (currentMailFormat === 'html') {
+    frame.srcdoc = cachedMailHtml;
+  }
+  const mailSection = document.getElementById('mail-section');
+  mailSection.classList.add('visible');
+  mailSection.scrollIntoView({ behavior: 'smooth' });
+}
+
+function copyMail() {
+  const btn = document.getElementById('copy-main-btn');
+  if (currentMailFormat === 'txt') {
+    const text = document.getElementById('mail-content').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = '✓ Copié !';
+      setTimeout(() => btn.textContent = 'Copier', 2000);
+    });
+  } else {
+    // Copier en tant que HTML rendu (pas texte brut) pour coller directement dans Outlook/Gmail
+    const blob = new Blob([cachedMailHtml], { type: 'text/html' });
+    const item = new ClipboardItem({ 'text/html': blob });
+    navigator.clipboard.write([item]).then(() => {
+      btn.textContent = '✓ Copié dans Outlook !';
+      setTimeout(() => btn.textContent = 'Copier HTML', 2000);
+    }).catch(() => {
+      // Fallback si ClipboardItem non supporté
+      navigator.clipboard.writeText(cachedMailHtml).then(() => {
+        btn.textContent = '✓ Copié (source)';
+        setTimeout(() => btn.textContent = 'Copier HTML', 2000);
+      });
+    });
+  }
+}
+
+function setMailFormat(fmt) {
+  currentMailFormat = fmt;
+  document.getElementById('btn-fmt-txt').classList.toggle('active', fmt === 'txt');
+  document.getElementById('btn-fmt-html').classList.toggle('active', fmt === 'html');
+  document.getElementById('mail-content').style.display = fmt === 'txt' ? '' : 'none';
+  document.getElementById('mail-html-frame').style.display = fmt === 'html' ? '' : 'none';
+  const btn = document.getElementById('copy-main-btn');
+  btn.textContent = fmt === 'html' ? 'Copier HTML' : 'Copier';
+  if (fmt === 'html' && cachedMailHtml) {
+    const frame = document.getElementById('mail-html-frame');
+    frame.srcdoc = cachedMailHtml;
+  }
+}
+
+// ═══════════════════════════════════════════════
+// HTML MAIL BUILDER
+// ═══════════════════════════════════════════════
+function buildMailHTML(d, txtFallback) {
+  const { week, year } = d;
+  const monthLabel = d.forecastMonthLabel || (d.month ? MONTHS_FR[d.month] : 'Tous mois');
+  const confirmedPeriodLabel = d.confirmedPeriodLabel || `${week} · ${year}`;
+  const forecastPeriodLabel = d.forecastPeriodLabel || `${monthLabel} · ${year}`;
+
+  // Helpers
+  const f = n => fmt(n);
+  const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+
+  // ── Sites ──
+  const sitesRows = Object.entries(d.bySite).map(([site, v]) => {
+    const label = SITE_MAP[site] || site;
+    const fcaTxt = v.fca > 0 ? `<span style="color:#8a6000;font-size:10px;margin-left:4px">${v.cip} CIP / ${v.fca} FCA</span>` : '';
+    return `<tr>
+      <td style="padding:6px 10px;border-bottom:1px solid #E8EFF6;font-weight:600;color:#004D8C">${label} <span style="font-weight:400;color:#8AA0B8;font-size:11px">(${site})</span>${fcaTxt}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid #E8EFF6;text-align:center">${v.total}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid #E8EFF6;text-align:right;font-family:monospace">${f(v.tonnes)} T</td>
+    </tr>`;
+  }).join('');
+
+  // ── Jours ──
+  const daysRows = Object.entries(d.byDay).sort(([a],[b])=>a.localeCompare(b)).map(([dateStr, count]) => {
+    const dt = new Date(dateStr + 'T12:00:00');
+    const dayFull = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'][dt.getDay()];
+    const dd = dt.getDate().toString().padStart(2,'0');
+    const mm = (dt.getMonth()+1).toString().padStart(2,'0');
+    return `<tr>
+      <td style="padding:5px 10px;border-bottom:1px solid #E8EFF6">${dayFull} ${dd}/${mm}</td>
+      <td style="padding:5px 10px;border-bottom:1px solid #E8EFF6;text-align:center;font-family:monospace;font-weight:600;color:#004D8C">${count} DA</td>
+    </tr>`;
+  }).join('');
+
+  // ── Pays ──
+  const paysRows = Object.entries(d.byPays).sort(([,a],[,b])=>b.da-a.da).slice(0,8).map(([pays, v]) => {
+    return `<tr>
+      <td style="padding:5px 10px;border-bottom:1px solid #E8EFF6;font-weight:600">${pays}</td>
+      <td style="padding:5px 10px;border-bottom:1px solid #E8EFF6;text-align:center">${v.da} DA</td>
+      <td style="padding:5px 10px;border-bottom:1px solid #E8EFF6;text-align:right;font-family:monospace">${f(v.tonnes)} T</td>
+    </tr>`;
+  }).join('');
+
+  // ── Remorques ──
+  const remRows = Object.entries(d.byRem).sort(([,a],[,b])=>b.da-a.da).map(([type, v]) => {
+    const pctVal = pct(v.da, d.totalDA);
+    return `<tr>
+      <td style="padding:5px 10px;border-bottom:1px solid #E8EFF6">${type}</td>
+      <td style="padding:5px 10px;border-bottom:1px solid #E8EFF6;text-align:center;font-family:monospace">${v.da}</td>
+      <td style="padding:5px 10px;border-bottom:1px solid #E8EFF6;text-align:right">
+        <span style="display:inline-block;background:#E8F2FA;color:#004D8C;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:600">${pctVal}%</span>
+      </td>
+    </tr>`;
+  }).join('');
+
+  // ── Codes 2 ──
+  const c2BySem = {};
+  d.codes2list.forEach(r => {
+    if (!c2BySem[r.sem]) c2BySem[r.sem] = { cip:[], fca:[] };
+    r.inco === 'CIP' ? c2BySem[r.sem].cip.push(r) : c2BySem[r.sem].fca.push(r);
+  });
+
+  let c2Html = '';
+  Object.keys(c2BySem).map(Number).sort((a,b)=>a-b).forEach(sem => {
+    const { cip, fca } = c2BySem[sem];
+    c2Html += `<div style="margin-bottom:12px">
+      <div style="font-size:12px;font-weight:700;color:#004D8C;background:#E8F2FA;padding:4px 10px;border-radius:4px;margin-bottom:6px">S${sem}</div>`;
+
+    if (cip.length) {
+      const cipTotal = f(cip.reduce((s,r)=>s+r.to,0));
+      c2Html += `<div style="font-size:11px;font-weight:600;color:#2E7D32;margin-bottom:4px">✅ CIP — ${cipTotal} T (géré cellule)</div>
+        <table width="100%" style="border-collapse:collapse;font-size:12px;margin-bottom:6px">
+          <thead><tr style="background:#F0F7F0">
+            <th style="padding:4px 8px;text-align:left;font-size:11px;color:#2E7D32">Commande</th>
+            <th style="padding:4px 8px;text-align:left;font-size:11px;color:#2E7D32">Site → Destination</th>
+            <th style="padding:4px 8px;text-align:center;font-size:11px;color:#2E7D32">Type</th>
+            <th style="padding:4px 8px;text-align:right;font-size:11px;color:#2E7D32">Tonnage</th>
+          </tr></thead>
+          <tbody>`;
+      cip.forEach(r => {
+        const lgM = r.lgCount ? r.lgSum/r.lgCount : 0;
+        const typeLabel = lgM > 15.1 ? '<span style="background:#FFF3E0;color:#E65100;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600">EXT</span>' : '<span style="background:#E8F2FA;color:#004D8C;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600">STD</span>';
+        c2Html += `<tr style="border-bottom:1px solid #E8EFF6">
+          <td style="padding:5px 8px;font-family:monospace;font-size:11px;color:#4A6080">${r.order}</td>
+          <td style="padding:5px 8px">${SITE_MAP[r.site]||r.site} → <strong>${r.pays}</strong> · ${r.ville}</td>
+          <td style="padding:5px 8px;text-align:center">${typeLabel}</td>
+          <td style="padding:5px 8px;text-align:right;font-family:monospace">${f(r.to)} T</td>
+        </tr>`;
+      });
+      c2Html += `</tbody></table>`;
+    }
+
+    if (fca.length) {
+      const fcaTotal = f(fca.reduce((s,r)=>s+r.to,0));
+      c2Html += `<div style="font-size:11px;font-weight:600;color:#8a6000;margin-bottom:4px">⚠️ FCA — ${fcaTotal} T (transporteur imposé client)</div>
+        <table width="100%" style="border-collapse:collapse;font-size:12px;margin-bottom:6px">
+          <thead><tr style="background:#FFFBF0">
+            <th style="padding:4px 8px;text-align:left;font-size:11px;color:#8a6000">Commande</th>
+            <th style="padding:4px 8px;text-align:left;font-size:11px;color:#8a6000">Site → Destination</th>
+            <th style="padding:4px 8px;text-align:center;font-size:11px;color:#8a6000">Type</th>
+            <th style="padding:4px 8px;text-align:right;font-size:11px;color:#8a6000">Tonnage</th>
+          </tr></thead>
+          <tbody>`;
+      fca.forEach(r => {
+        const lgM = r.lgCount ? r.lgSum/r.lgCount : 0;
+        const typeLabel = lgM > 15.1 ? '<span style="background:#FFF3E0;color:#E65100;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600">EXT</span>' : '<span style="background:#E8F2FA;color:#004D8C;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600">STD</span>';
+        c2Html += `<tr style="border-bottom:1px solid #E8EFF6">
+          <td style="padding:5px 8px;font-family:monospace;font-size:11px;color:#4A6080">${r.order}</td>
+          <td style="padding:5px 8px">${SITE_MAP[r.site]||r.site} → <strong>${r.pays}</strong> · ${r.ville}</td>
+          <td style="padding:5px 8px;text-align:center">${typeLabel}</td>
+          <td style="padding:5px 8px;text-align:right;font-family:monospace">${f(r.to)} T</td>
+        </tr>`;
+      });
+      c2Html += `</tbody></table>`;
+    }
+    c2Html += `</div>`;
+  });
+
+  // ── Alerts ──
+  let alertHtml = '';
+  Object.entries(d.bySite).forEach(([site, v]) => {
+    if (v.fca > v.cip) {
+      alertHtml += `<div style="border-left:3px solid #F9A825;background:#FFFBF0;padding:8px 12px;border-radius:4px;margin-bottom:6px;font-size:12px;color:#8a6000">
+        ⚠️ <strong>${SITE_MAP[site]||site}</strong> : FCA (${v.fca} DA) dépasse le CIP (${v.cip} DA).
+      </div>`;
+    }
+  });
+
+  const totalC2 = d.c2cipT + d.c2fcaT;
+
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Topo ${confirmedPeriodLabel} — Palplanches</title>
+</head>
+<body style="margin:0;padding:0;background:#F4F7FA;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#0D1B2A">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#F4F7FA;padding:20px 0">
+<tr><td align="center">
+<table width="620" cellpadding="0" cellspacing="0" style="max-width:620px;width:100%">
+
+  <!-- HEADER -->
+  <tr><td style="background:#004D8C;border-radius:8px 8px 0 0;padding:18px 24px">
+    <span style="color:white;font-size:16px;font-weight:700">📦 Topo Transport — ${confirmedPeriodLabel}</span><br>
+    <span style="color:rgba(255,255,255,0.65);font-size:12px">Palplanches · ArcelorMittal · Cellule 3PL Lorang & Portmann</span>
+  </td></tr>
+
+  <!-- INTRO -->
+  <tr><td style="background:white;padding:20px 24px 0">
+    <p style="margin:0 0 6px;color:#0D1B2A">Micael,</p>
+    <p style="margin:0 0 16px;color:#4A6080;font-size:13px">En compensation de notre point hebdo, tu trouveras ci-dessous l'analyse confirmée ${confirmedPeriodLabel}.</p>
+  </td></tr>
+
+  <!-- KPI ROW -->
+  <tr><td style="background:white;padding:0 24px 20px">
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td style="width:25%;padding:4px">
+          <div style="background:#E8F2FA;border-radius:6px;padding:12px;text-align:center">
+            <div style="font-size:10px;color:#8AA0B8;font-weight:600;text-transform:uppercase;margin-bottom:4px">DA chargées</div>
+            <div style="font-size:22px;font-weight:700;color:#004D8C;font-family:monospace">${d.totalDA}</div>
+          </div>
+        </td>
+        <td style="width:25%;padding:4px">
+          <div style="background:#E8F2FA;border-radius:6px;padding:12px;text-align:center">
+            <div style="font-size:10px;color:#8AA0B8;font-weight:600;text-transform:uppercase;margin-bottom:4px">Tonnage expédié</div>
+            <div style="font-size:22px;font-weight:700;color:#004D8C;font-family:monospace">${f(d.totalT)} T</div>
+          </div>
+        </td>
+        <td style="width:25%;padding:4px">
+          <div style="background:#E8F2FA;border-radius:6px;padding:12px;text-align:center">
+            <div style="font-size:10px;color:#8AA0B8;font-weight:600;text-transform:uppercase;margin-bottom:4px">Poids moy. STD</div>
+            <div style="font-size:22px;font-weight:700;color:#004D8C;font-family:monospace">${f(d.avgStd)} T</div>
+          </div>
+        </td>
+        <td style="width:25%;padding:4px">
+          <div style="background:#E8F2FA;border-radius:6px;padding:12px;text-align:center">
+            <div style="font-size:10px;color:#8AA0B8;font-weight:600;text-transform:uppercase;margin-bottom:4px">Ratio CIP</div>
+            <div style="font-size:22px;font-weight:700;color:#004D8C;font-family:monospace">${pct(d.cipDA, d.totalDA)}%</div>
+          </div>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+
+  <!-- SEPARATOR -->
+  <tr><td style="background:white;padding:0 24px"><hr style="border:none;border-top:1px solid #D0DDE8;margin:0 0 16px"></td></tr>
+
+  <!-- SITES -->
+  <tr><td style="background:white;padding:0 24px 16px">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#8AA0B8;margin-bottom:8px">Répartition par site</div>
+    ${alertHtml}
+    <table width="100%" style="border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:#F4F7FA">
+        <th style="padding:6px 10px;text-align:left;font-size:11px;color:#8AA0B8;font-weight:600;border-bottom:2px solid #D0DDE8">Site</th>
+        <th style="padding:6px 10px;text-align:center;font-size:11px;color:#8AA0B8;font-weight:600;border-bottom:2px solid #D0DDE8">DA</th>
+        <th style="padding:6px 10px;text-align:right;font-size:11px;color:#8AA0B8;font-weight:600;border-bottom:2px solid #D0DDE8">Tonnage</th>
+      </tr></thead>
+      <tbody>${sitesRows}</tbody>
+    </table>
+  </td></tr>
+
+  <!-- REMORQUES + JOURS -->
+  <tr><td style="background:white;padding:0 24px 16px">
+    <table width="100%" cellpadding="0" cellspacing="8">
+      <tr>
+        <td style="width:50%;vertical-align:top;padding-right:6px">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#8AA0B8;margin-bottom:8px">Remorques</div>
+          <table width="100%" style="border-collapse:collapse;font-size:12px">
+            <thead><tr style="background:#F4F7FA">
+              <th style="padding:5px 10px;text-align:left;font-size:11px;color:#8AA0B8;border-bottom:2px solid #D0DDE8">Type</th>
+              <th style="padding:5px 10px;text-align:center;font-size:11px;color:#8AA0B8;border-bottom:2px solid #D0DDE8">DA</th>
+              <th style="padding:5px 10px;text-align:right;font-size:11px;color:#8AA0B8;border-bottom:2px solid #D0DDE8">%</th>
+            </tr></thead>
+            <tbody>${remRows}</tbody>
+          </table>
+        </td>
+        <td style="width:50%;vertical-align:top;padding-left:6px">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#8AA0B8;margin-bottom:8px">Chargements par jour</div>
+          <table width="100%" style="border-collapse:collapse;font-size:12px">
+            <thead><tr style="background:#F4F7FA">
+              <th style="padding:5px 10px;text-align:left;font-size:11px;color:#8AA0B8;border-bottom:2px solid #D0DDE8">Jour</th>
+              <th style="padding:5px 10px;text-align:right;font-size:11px;color:#8AA0B8;border-bottom:2px solid #D0DDE8">Volume</th>
+            </tr></thead>
+            <tbody>${daysRows}</tbody>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+
+  <!-- PAYS -->
+  <tr><td style="background:white;padding:0 24px 20px">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#8AA0B8;margin-bottom:8px">Destinations</div>
+    <table width="100%" style="border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:#F4F7FA">
+        <th style="padding:5px 10px;text-align:left;font-size:11px;color:#8AA0B8;border-bottom:2px solid #D0DDE8">Pays</th>
+        <th style="padding:5px 10px;text-align:center;font-size:11px;color:#8AA0B8;border-bottom:2px solid #D0DDE8">DA</th>
+        <th style="padding:5px 10px;text-align:right;font-size:11px;color:#8AA0B8;border-bottom:2px solid #D0DDE8">Tonnage</th>
+      </tr></thead>
+      <tbody>${paysRows}</tbody>
+    </table>
+  </td></tr>
+
+  <!-- CODES 2 HEADER -->
+  <tr><td style="background:#D32F2F;padding:12px 24px">
+    <span style="color:white;font-size:13px;font-weight:700">🔴 FORECAST — CODES 2 EN ATTENTE ${forecastPeriodLabel.toUpperCase()}</span>
+  </td></tr>
+
+  <!-- CODES 2 SUMMARY -->
+  <tr><td style="background:white;padding:16px 24px 0">
+    <table width="100%" cellpadding="0" cellspacing="4">
+      <tr>
+        <td style="padding:4px">
+          <div style="background:#E8F5E9;border-radius:6px;padding:10px 14px">
+            <div style="font-size:10px;font-weight:700;color:#2E7D32;margin-bottom:3px">✅ CIP — Géré cellule</div>
+            <div style="font-size:18px;font-weight:700;color:#1B5E20;font-family:monospace">${f(d.c2cipT)} T</div>
+          </div>
+        </td>
+        <td style="padding:4px">
+          <div style="background:#FFF8E1;border-radius:6px;padding:10px 14px">
+            <div style="font-size:10px;font-weight:700;color:#8a6000;margin-bottom:3px">⚠️ FCA — Transporteur client</div>
+            <div style="font-size:18px;font-weight:700;color:#8a6000;font-family:monospace">${f(d.c2fcaT)} T</div>
+          </div>
+        </td>
+        <td style="padding:4px">
+          <div style="background:#E8F2FA;border-radius:6px;padding:10px 14px">
+            <div style="font-size:10px;font-weight:700;color:#004D8C;margin-bottom:3px">Total Code 2</div>
+            <div style="font-size:18px;font-weight:700;color:#004D8C;font-family:monospace">${f(totalC2)} T</div>
+          </div>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+
+  <!-- CODES 2 DETAIL -->
+  <tr><td style="background:white;padding:12px 24px 20px">
+    ${c2Html}
+    <p style="margin:12px 0 0;color:#4A6080;font-size:12px;font-style:italic">Ces commandes sont en cours de traitement.</p>
+  </td></tr>
+
+  <!-- FOOTER -->
+  <tr><td style="background:#F4F7FA;border-top:2px solid #004D8C;border-radius:0 0 8px 8px;padding:14px 24px">
+    <p style="margin:0 0 4px;font-weight:700;color:#004D8C;font-size:13px">Jeremy Ducrot</p>
+    <p style="margin:0;color:#8AA0B8;font-size:11px">Cellule 3PL – Lorang & Portmann · Transports ArcelorMittal Palplanches</p>
+    <p style="margin:4px 0 0;font-size:11px;color:#8AA0B8">Je suis à ta dispo si tu as besoin de plus d'informations.</p>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
+}
+
+// ═══════════════════════════════════════════════
+// PDF EXPORT
+// ═══════════════════════════════════════════════
+function exportPDF() {
+  window.print();
+}
+
+// ═══════════════════════════════════════════════
+// VIEW SWITCHING
+// ═══════════════════════════════════════════════
+function switchView(view) {
+  document.querySelectorAll('.view-pane').forEach(el => el.classList.remove('active'));
+  document.getElementById('view-' + view).classList.add('active');
+  document.querySelectorAll('.view-tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + view).classList.add('active');
+
+  const analyseActions = document.getElementById('topbar-analyse-actions');
+  if (analyseActions) analyseActions.style.display = view === 'analyse' ? '' : 'none';
+
+  // Si on switche vers SAP et que les données sont disponibles, construire la vue
+  if (view === 'sap') {
+    if (sapAllData.length === 0 && (sapLoadedL || sapLoadedDA)) {
+      sapMerge();
+    } else if (sapAllData.length > 0) {
+      // déjà chargé, ne rien faire
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════
+// SAP VIEW — DATA ENGINE
+// ═══════════════════════════════════════════════
+const SAP_PT = {'4003':'Belval','M003':'Mertert','5003':'Differdange','LT03':'Trier','6303':'Messempré','5513':'Messempré'};
+const SAP_COUNTRY = {
+  AT:'Autriche',BE:'Belgique',BG:'Bulgarie',CH:'Suisse',CL:'Chili',CN:'Chine',
+  DE:'Allemagne',DK:'Danemark',EE:'Estonie',ES:'Espagne',FI:'Finlande',
+  FR:'France',GB:'Royaume-Uni',HR:'Croatie',IE:'Irlande',IT:'Italie',
+  LT:'Lituanie',LU:'Luxembourg',NL:'Pays-Bas',NO:'Norvège',PL:'Pologne',
+  PT:'Portugal',RO:'Roumanie',SE:'Suède',TR:'Turquie',US:'États-Unis',AU:'Australie',XS:'Export'
+};
+
+let sapAllData = [], sapFiltered = [];
+let sapPrevRows = [], sapDARows = [];
+let sapLoadedL = false, sapLoadedDA = false;
+let sapPage = 1; const SAP_PS = 50;
+let sapSCol = null, sapSDir = 1;
+let sapQSActive = false, sapQSVal = '';
+
+function sapXlsxDate(v) {
+  if (!v && v !== 0) return '';
+  if (v instanceof Date) return v.toLocaleDateString('fr-FR');
+  if (typeof v === 'number') {
+    try {
+      const d = XLSX.SSF.parse_date_code(v);
+      if (d) return `${String(d.d).padStart(2,'0')}/${String(d.m).padStart(2,'0')}/${d.y}`;
+    } catch(e) {}
+  }
+  if (typeof v === 'string') {
+    if (/\d{2}\/\d{2}\/\d{4}/.test(v)) return v;
+    const dt = new Date(v);
+    if (!isNaN(dt)) return dt.toLocaleDateString('fr-FR');
+  }
+  return String(v);
+}
+
+function sapParseDate(s) {
+  if (!s) return null;
+  const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (m) return new Date(+m[3], +m[2]-1, +m[1]);
+  return null;
+}
+
+// Called when LORANG file is loaded (from main loadSAP function)
+function sapParseLorang(wb) {
+  const ws = wb.Sheets['LORANG'];
+  if (!ws) return;
+  const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+  sapPrevRows = [];
+  for (let i = 1; i < raw.length; i++) {
+    const r = raw[i];
+    if (!r[0]) continue;
+    const toRaw = r[17];
+    let kg = null;
+    if (toRaw !== '' && toRaw !== null && !isNaN(Number(toRaw))) kg = Number(toRaw);
+    const lRaw = r[10];
+    let lon = null;
+    if (lRaw !== '' && !isNaN(Number(lRaw))) lon = Math.round(Number(lRaw) / 1000 * 100) / 100;
+    const rawInco = String(r[13]||'').trim();
+    const normInco = ['CPT','CIF'].includes(rawInco) ? 'CIP' : rawInco;
+    // Normalize vehicule
+    const rawVeh = String(r[15]||'').trim();
+    let normVeh = rawVeh;
+    if (/EXTENSIBLE|EXT/i.test(rawVeh) && !/DBLE|DOUBLE/i.test(rawVeh)) normVeh = 'Extensible';
+    else if (/DBLE|DOUBLE/i.test(rawVeh)) normVeh = 'Extensible'; // double ext aussi extensible
+    else if (/TRUCK|PLATEAU|TAUT|FLATBED|STANDARD/i.test(rawVeh)) normVeh = 'Standard';
+    sapPrevRows.push({
+      _source: 'PREV',
+      da: '',
+      order: String(r[0]),
+      cv: String(r[1] ?? ''),
+      date_chgt: sapXlsxDate(r[2]),
+      date_livr: sapXlsxDate(r[6]),
+      site: SAP_PT[String(r[7])] || String(r[7]),
+      incoterm: normInco,
+      vehicule: normVeh,
+      longueur: lon,
+      tonnage_kg: kg,
+      pays: String(r[20]||''),
+      ville: String(r[24]||''),
+      destinataire: String(r[27]||''),
+    });
+  }
+  sapLoadedL = true;
+  if (sapLoadedDA) sapMerge();
+}
+
+// Called when DA file is loaded (from main loadDA function)
+function sapParseDA(wb) {
+  const ws = wb.Sheets['Data'];
+  if (!ws) return;
+  const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+  sapDARows = [];
+  for (let i = 1; i < raw.length; i++) {
+    const r = raw[i];
+    if (!r[0]) continue;
+    const kgRaw = r[2];
+    let kg = null;
+    if (kgRaw !== '' && !isNaN(Number(kgRaw))) kg = Number(kgRaw);
+    const lRaw = r[4];
+    let lon = null;
+    if (lRaw !== '' && lRaw !== null) {
+      const lv = parseFloat(String(lRaw).replace(',','.'));
+      if (!isNaN(lv)) lon = lv;
+    }
+    const rawVeh = String(r[21]||'').trim();
+    let normVeh = rawVeh;
+    if (/EXTENSIBLE|EXT/i.test(rawVeh) && !/DBLE|DOUBLE/i.test(rawVeh)) normVeh = 'Extensible';
+    else if (/DBLE|DOUBLE/i.test(rawVeh)) normVeh = 'Extensible';
+    else if (/TRUCK|PLATEAU|TAUT|FLATBED|STANDARD/i.test(rawVeh)) normVeh = 'Standard';
+    const rawInco = String(r[20]||'').trim();
+    const normInco = ['CPT','CIF'].includes(rawInco) ? 'CIP' : rawInco;
+    sapDARows.push({
+      _source: 'DA',
+      da: String(r[0]),
+      order: String(r[1]||''),
+      cv: '',
+      date_chgt: sapXlsxDate(r[13]),
+      date_livr: '',
+      site: SAP_PT[String(r[8])] || String(r[8]||''),
+      incoterm: normInco,
+      vehicule: normVeh,
+      longueur: lon,
+      tonnage_kg: kg,
+      pays: String(r[10]||''),
+      ville: String(r[12]||''),
+      destinataire: String(r[9]||''),
+    });
+  }
+  sapLoadedDA = true;
+  if (sapLoadedL) sapMerge();
+}
+
+function sapMerge() {
+  sapAllData = [...sapPrevRows, ...sapDARows];
+  // Populate pays dropdown
+  const pays = [...new Set(sapAllData.map(r => r.pays).filter(Boolean))].sort();
+  const fP = document.getElementById('sapFPays');
+  if (fP) {
+    fP.innerHTML = '<option value="">Tous</option>' +
+      pays.map(p => `<option value="${p}">${p} — ${SAP_COUNTRY[p]||''}</option>`).join('');
+  }
+  document.getElementById('sapKpiBar').style.display = 'grid';
+  document.getElementById('sapFiltersWrap').style.display = 'block';
+  document.getElementById('sapTableWrap').style.display = 'block';
+  document.getElementById('sapEmpty').style.display = 'none';
+  document.getElementById('sapBtnExport').disabled = false;
+  sapApplyFilters();
+}
+
+// ── SAP Filters ──
+function sapGetFiltered() {
+  let src = [...sapAllData];
+  const fSrc  = (document.getElementById('sapFSource')||{}).value || '';
+  const fInco = (document.getElementById('sapFInco')||{}).value || '';
+  const fVeh  = (document.getElementById('sapFVeh')||{}).value || '';
+  const fCV   = (document.getElementById('sapFCV')||{}).value || '';
+  const fSite = (document.getElementById('sapFSite')||{}).value || '';
+  const fPays = (document.getElementById('sapFPays')||{}).value || '';
+  const fDu   = (document.getElementById('sapFDateDu')||{}).value || '';
+  const fAu   = (document.getElementById('sapFDateAu')||{}).value || '';
+
+  if (fSrc)  src = src.filter(r => r._source === fSrc);
+  if (fInco) src = src.filter(r => r.incoterm === fInco);
+  if (fVeh)  src = src.filter(r => r.vehicule === fVeh);
+  if (fCV)   src = src.filter(r => r.cv === fCV);
+  if (fSite) src = src.filter(r => r.site === fSite);
+  if (fPays) src = src.filter(r => r.pays === fPays);
+
+  if (fDu || fAu) {
+    const dtDu = fDu ? new Date(fDu) : null;
+    const dtAu = fAu ? new Date(fAu) : null;
+    if (dtAu) dtAu.setHours(23,59,59);
+    src = src.filter(r => {
+      const dt = sapParseDate(r.date_chgt);
+      if (!dt) return false;
+      if (dtDu && dt < dtDu) return false;
+      if (dtAu && dt > dtAu) return false;
+      return true;
+    });
+  }
+
+  if (sapQSActive && sapQSVal) {
+    const q = sapQSVal.toLowerCase();
+    src = src.filter(r =>
+      r.order.toLowerCase().includes(q) ||
+      r.da.toLowerCase().includes(q) ||
+      r.pays.toLowerCase().includes(q) ||
+      (SAP_COUNTRY[r.pays]||'').toLowerCase().includes(q) ||
+      r.incoterm.toLowerCase().includes(q) ||
+      r.cv.toLowerCase().includes(q) ||
+      (r.ville||'').toLowerCase().includes(q) ||
+      (r.destinataire||'').toLowerCase().includes(q)
+    );
+  }
+
+  if (sapSCol) {
+    src.sort((a,b) => {
+      let av = a[sapSCol] ?? '', bv = b[sapSCol] ?? '';
+      if (typeof av === 'number' && typeof bv === 'number') return sapSDir * (av - bv);
+      return sapSDir * String(av).localeCompare(String(bv), 'fr');
+    });
+  }
+  return src;
+}
+
+function sapApplyFilters() {
+  sapPage = 1;
+  sapFiltered = sapGetFiltered();
+  sapRenderTable();
+  sapUpdateKPIs();
+}
+
+// ── SAP Quick Search ──
+function sapOnQSKey(e) {
+  if (e.key === 'Enter') sapApplyQS();
+  if (e.key === 'Escape') sapClearQS();
+}
+function sapApplyQS() {
+  const v = (document.getElementById('sapQuickSearch')||{}).value?.trim() || '';
+  if (!v) { sapClearQS(); return; }
+  sapQSVal = v; sapQSActive = true;
+  const bar = document.getElementById('sapActiveSearch');
+  if (bar) bar.style.display = 'flex';
+  const tag = document.getElementById('sapActiveTag');
+  if (tag) tag.innerHTML = `<div class="sap-active-tag">${sapEsc(v)}<span class="sap-rm" onclick="sapClearQS()">×</span></div>`;
+  sapApplyFilters();
+}
+function sapClearQS() {
+  sapQSActive = false; sapQSVal = '';
+  const qs = document.getElementById('sapQuickSearch');
+  if (qs) qs.value = '';
+  const bar = document.getElementById('sapActiveSearch');
+  if (bar) bar.style.display = 'none';
+  sapApplyFilters();
+}
+function sapRazFilters() {
+  ['sapFSource','sapFInco','sapFVeh','sapFCV','sapFSite','sapFPays','sapFDateDu','sapFDateAu']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  sapClearQS();
+}
+
+// ── SAP KPIs ──
+function sapUpdateKPIs() {
+  const pF = sapFiltered.filter(r => r._source === 'PREV');
+  const dF = sapFiltered.filter(r => r._source === 'DA');
+  const pT = pF.reduce((s,r) => s + (r.tonnage_kg||0), 0);
+  const dT = dF.reduce((s,r) => s + (r.tonnage_kg||0), 0);
+  const tot = pT + dT;
+
+  const distinctOrders = new Set(pF.map(r => r.order).filter(Boolean)).size;
+  const el = id => document.getElementById(id);
+  if (!el('sapKpiPrevCt')) return;
+
+  el('sapKpiPrevCt').textContent = distinctOrders.toLocaleString('fr-FR');
+  el('sapKpiPrevT').textContent = Math.trunc(pT).toLocaleString('fr-FR') + ' kg';
+  el('sapKpiDaCt').textContent = dF.length.toLocaleString('fr-FR');
+  el('sapKpiDaT').textContent = Math.trunc(dT).toLocaleString('fr-FR') + ' kg';
+  el('sapKpiTot').textContent = Math.round(tot/1000).toLocaleString('fr-FR');
+  el('sapKpiTotSub').textContent = 'tonnes affichées';
+
+  const t = sapFiltered.length || 1;
+  const ic = {};
+  sapFiltered.forEach(r => { ic[r.incoterm||'?'] = (ic[r.incoterm||'?']||0) + 1; });
+  const cipP = Math.round((ic['CIP']||0)/t*100);
+  const fcaP = Math.round((ic['FCA']||0)/t*100);
+  const ddpP = Math.round((ic['DDP']||0)/t*100);
+  const dominant = cipP >= fcaP && cipP >= ddpP ? 'CIP' : fcaP >= ddpP ? 'FCA' : 'DDP';
+  el('sapKpiInco').textContent = dominant;
+  el('sapKpiIncoSub').textContent = `CIP ${cipP}% · FCA ${fcaP}% · DDP ${ddpP}%`;
+
+  const ext = sapFiltered.filter(r => (r.vehicule||'') === 'Extensible').length;
+  const std = sapFiltered.filter(r => (r.vehicule||'') === 'Standard').length;
+  const extP = ext+std > 0 ? Math.round(ext/(ext+std)*100) : 0;
+  el('sapKpiVeh').textContent = ext >= std ? 'Extensible' : 'Standard';
+  el('sapKpiVehSub').textContent = `Ext. ${ext} (${extP}%) · Std. ${std} (${100-extP}%)`;
+}
+
+// ── SAP Table ──
+const SAP_COLS = [
+  { key:'_source',      label:'Source',       cls:'',     render: r => r._source==='PREV' ? '<span class="sap-badge sap-b-prev">PRÉV.</span>' : '<span class="sap-badge sap-b-da">DA</span>' },
+  { key:'da',           label:'N° DA',        cls:'',     render: r => r.da ? `<span class="sap-mono">${r.da}</span>` : '—' },
+  { key:'order',        label:'SAP',          cls:'',     render: r => r.order ? `<span class="sap-mono">${r.order}</span>` : '—' },
+  { key:'cv',           label:'Code Val.',    cls:'',     render: r => r.cv ? `<span class="${r.cv==='1'?'sap-b-cv1':r.cv==='2'?'sap-b-cv2':'sap-b-cv'}">${r.cv}</span>` : '—' },
+  { key:'date_chgt',    label:'Chargement',   cls:'',     render: r => r.date_chgt || '—' },
+  { key:'date_livr',    label:'Livraison',    cls:'',     render: r => r.date_livr || '—' },
+  { key:'site',         label:'Site exp.',    cls:'',     render: r => r.site || '—' },
+  { key:'incoterm',     label:'Incoterm',     cls:'',     render: r => r.incoterm ? `<span class="sap-badge sap-b-${r.incoterm.toLowerCase()}">${r.incoterm}</span>` : '—' },
+  { key:'vehicule',     label:'Véhicule',     cls:'',     render: r => r.vehicule ? `<span class="sap-badge ${r.vehicule==='Extensible'?'sap-b-ext':'sap-b-std'}">${r.vehicule}</span>` : '—' },
+  { key:'longueur',     label:'Long. (m)',    cls:'sap-tr', render: r => r.longueur != null ? `<span class="sap-mono">${r.longueur}</span>` : '—' },
+  { key:'tonnage_kg',   label:'Tonnage (kg)', cls:'sap-tr', render: r => r.tonnage_kg != null ? `<span class="sap-mono" style="font-weight:600">${sapFmtKg(r.tonnage_kg)}</span>` : '—' },
+  { key:'pays',         label:'Pays',         cls:'',     render: r => r.pays ? `<span class="sap-pays-cell">${r.pays}</span><span class="sap-pays-name">${SAP_COUNTRY[r.pays]||''}</span>` : '—' },
+  { key:'ville',        label:'Ville',        cls:'',     render: r => r.ville || '—' },
+  { key:'destinataire', label:'Destinataire', cls:'',     render: r => r.destinataire || '—' },
+];
+
+function sapFmtKg(v) { return Math.trunc(v).toLocaleString('fr-FR'); }
+
+function sapRenderTable() {
+  const total = sapFiltered.length;
+  const tp = Math.max(1, Math.ceil(total / SAP_PS));
+  if (sapPage > tp) sapPage = 1;
+  const slice = sapFiltered.slice((sapPage-1)*SAP_PS, sapPage*SAP_PS);
+
+  const thead = document.getElementById('sapTHead');
+  if (thead) {
+    thead.innerHTML = '<tr>' + SAP_COLS.map(c =>
+      `<th onclick="sapSortBy('${c.key}')" class="${sapSCol===c.key?(sapSDir===1?'asc':'desc'):''}">
+        ${c.label}<span class="sap-si"></span>
+      </th>`
+    ).join('') + '</tr>';
+  }
+
+  const tbody = document.getElementById('sapTBody');
+  if (!tbody) return;
+  if (!slice.length) {
+    tbody.innerHTML = `<tr><td colspan="${SAP_COLS.length}" style="text-align:center;padding:40px;color:var(--text-muted)">
+      <div style="font-size:30px;margin-bottom:8px">🔍</div>Aucune donnée correspondante</td></tr>`;
+  } else {
+    tbody.innerHTML = slice.map(row =>
+      '<tr>' + SAP_COLS.map(c => `<td class="${c.cls}">${c.render(row)}</td>`).join('') + '</tr>'
+    ).join('');
+  }
+
+  const info = document.getElementById('sapTableInfo');
+  if (info) info.innerHTML = `<strong>${total.toLocaleString('fr-FR')}</strong> lignes — page <strong>${sapPage}</strong> / ${tp}`;
+  sapRenderPagination(tp);
+}
+
+function sapSortBy(key) {
+  if (sapSCol === key) sapSDir *= -1; else { sapSCol = key; sapSDir = 1; }
+  sapFiltered = sapGetFiltered();
+  sapRenderTable();
+}
+
+function sapRenderPagination(tp) {
+  const pg = document.getElementById('sapPagination');
+  if (!pg) return;
+  if (tp <= 1) { pg.innerHTML = ''; return; }
+  let h = `<button class="sap-pg-btn" onclick="sapGoPage(${sapPage-1})" ${sapPage===1?'disabled':''}>‹</button>`;
+  sapPagNums(sapPage, tp).forEach(p => {
+    if (p === '…') h += `<span class="sap-pg-sep">…</span>`;
+    else h += `<button class="sap-pg-btn ${p===sapPage?'active':''}" onclick="sapGoPage(${p})">${p}</button>`;
+  });
+  h += `<button class="sap-pg-btn" onclick="sapGoPage(${sapPage+1})" ${sapPage===tp?'disabled':''}>›</button>`;
+  pg.innerHTML = h;
+}
+function sapPagNums(cur, tot) {
+  if (tot <= 7) return Array.from({length:tot}, (_,i) => i+1);
+  const o = [1];
+  if (cur > 3) o.push('…');
+  for (let i = Math.max(2,cur-1); i <= Math.min(tot-1,cur+1); i++) o.push(i);
+  if (cur < tot-2) o.push('…');
+  o.push(tot);
+  return o;
+}
+function sapGoPage(p) {
+  const tp = Math.max(1, Math.ceil(sapFiltered.length/SAP_PS));
+  sapPage = Math.max(1, Math.min(p, tp));
+  sapRenderTable();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// ── SAP Export ──
+function sapExportExcel() {
+  if (!sapFiltered.length) { alert('Aucune donnée à exporter.'); return; }
+  const hdr = SAP_COLS.map(c => c.label);
+  const rows = sapFiltered.map(r => [
+    r._source, r.da, r.order, r.cv, r.date_chgt, r.date_livr,
+    r.site, r.incoterm, r.vehicule, r.longueur,
+    r.tonnage_kg != null ? Math.trunc(r.tonnage_kg) : '',
+    r.pays, r.ville, r.destinataire||''
+  ]);
+  const ws = XLSX.utils.aoa_to_sheet([hdr, ...rows]);
+  ws['!cols'] = [8,12,14,9,12,12,14,10,12,10,14,8,22,30].map(w => ({wch:w}));
+  const wb2 = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb2, ws, 'Commandes SAP');
+  const d = new Date().toLocaleDateString('fr-FR').replace(/\//g,'-');
+  XLSX.writeFile(wb2, `FlowAnalyse_SAP_${d}.xlsx`);
+}
+
+function sapEsc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
