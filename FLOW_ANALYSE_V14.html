@@ -2412,64 +2412,7 @@ function renderReport(d) {
   <div class="trend-chart-card">
     <div class="chart-title">&#128200; Tonnage total par semaine — 5 semaines glissantes</div>
     <canvas id="weekTrendChart" height="80"></canvas>
-  </div>
-  <script>
-  (function() {
-    const ctx = document.getElementById('weekTrendChart');
-    if (!ctx) return;
-    const wt   = ${JSON.stringify(d.weekTrend)};
-    const data  = wt.points;
-    const selW  = wt.selW;
-    const labels = data.map(p => 'S' + p.week + (p.week === selW ? ' ◀' : ''));
-    const vals   = data.map(p => p.t);
-    const colors = data.map(p => p.week === selW ? '#004D8C' : p.week < selW ? '#86BC24' : '#f59e0b');
-    new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels,
-        datasets: [{
-          label: 'Tonnage (T)',
-          data: vals,
-          borderColor: '#004D8C',
-          backgroundColor: 'rgba(0,77,140,.07)',
-          borderWidth: 2.5,
-          pointBackgroundColor: colors,
-          pointBorderColor: colors,
-          pointRadius: 6,
-          pointHoverRadius: 8,
-          fill: true,
-          tension: 0.3
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: ctx => ' ' + ctx.parsed.y.toLocaleString('fr-FR') + ' T'
-            }
-          },
-          datalabels: { display: false }
-        },
-        scales: {
-          y: {
-            beginAtZero: false,
-            ticks: {
-              callback: v => v.toLocaleString('fr-FR') + ' T',
-              font: { size: 11 }
-            },
-            grid: { color: 'rgba(0,0,0,.05)' }
-          },
-          x: {
-            ticks: { font: { size: 12, weight: '600' } },
-            grid: { display: false }
-          }
-        }
-      }
-    });
-  })();
-  <\/script>` : ''}
+  </div>` : ''}
 
   ${alertsHtml}
 
@@ -2599,6 +2542,52 @@ function renderReport(d) {
   `;
 
   document.getElementById('report').innerHTML = html;
+
+  // ── Graphique tendance tonnage 5 semaines glissantes ──
+  const weekTrendCanvas = document.getElementById('weekTrendChart');
+  if (weekTrendCanvas && d.weekTrend) {
+    const wt = d.weekTrend;
+    const labels = wt.points.map(p => 'S' + p.week + (p.week === wt.selW ? ' ◀' : ''));
+    const vals   = wt.points.map(p => p.t);
+    const colors = wt.points.map(p => p.week === wt.selW ? '#004D8C' : p.week < wt.selW ? '#86BC24' : '#f59e0b');
+    new Chart(weekTrendCanvas, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Tonnage (T)',
+          data: vals,
+          borderColor: '#004D8C',
+          backgroundColor: 'rgba(0,77,140,.07)',
+          borderWidth: 2.5,
+          pointBackgroundColor: colors,
+          pointBorderColor: colors,
+          pointRadius: 7,
+          pointHoverRadius: 9,
+          fill: true,
+          tension: 0.35
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: c => ' ' + c.parsed.y.toLocaleString('fr-FR') + ' T' } }
+        },
+        scales: {
+          y: {
+            beginAtZero: false,
+            ticks: { callback: v => v.toLocaleString('fr-FR') + ' T', font: { size: 11 } },
+            grid: { color: 'rgba(0,0,0,.05)' }
+          },
+          x: {
+            ticks: { font: { size: 12, weight: '600' } },
+            grid: { display: false }
+          }
+        }
+      }
+    });
+  }
 
   // ── Graphique DA confirmées par mois ──
   const monthlyCanvas = document.getElementById(monthlyChartId);
