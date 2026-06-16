@@ -1991,6 +1991,12 @@ function runAnalysis() {
 
   const yearFilters = getMultiValues('year');
   const weekFilters = getMultiValues('week');
+  const confirmedMonthFilters = getMultiValues('month-confirmed');
+  const forecastMonthFilters = getMultiValues('month-forecast');
+  const siteFilters = getMultiValues('site');
+  const paysFilters = getMultiValues('pays');
+  const incoFilters = getMultiValues('inco');
+  const transporteurFilters = getMultiValues('transporteur');
 function computeWeekKpis(weekNums) {
   const rows = daData.filter(r => r.DATE instanceof Date && matchSelected(r.DATE.getFullYear(), yearFilters) && weekNums.includes(r.SEMAINE) && matchSelected(r.DATE.getMonth()+1, confirmedMonthFilters) && matchSelected(r.EXPEDITEUR, siteFilters) && matchSelected(r.PAYS, paysFilters) && matchSelected(r.INCOTERME, incoFilters) && matchSelected(r.TRANSPORTEUR, transporteurFilters));
   const map = {}; rows.forEach(r => { if (!map[r.DA]) map[r.DA] = r; });
@@ -2012,12 +2018,6 @@ const kpiPrev = selWeeks.length ? computeWeekKpis(prevWeeks) : null;
 const kpiNext = selWeeks.length ? computeWeekKpis(nextWeeks) : null;
 const prevLabel = prevWeeks.length ? 'S'+prevWeeks[0] : '';
 const nextLabel = nextWeeks.length ? 'S'+nextWeeks[0]+'*' : '';
-  const confirmedMonthFilters = getMultiValues('month-confirmed');
-  const forecastMonthFilters = getMultiValues('month-forecast');
-  const siteFilters = getMultiValues('site');
-  const paysFilters = getMultiValues('pays');
-  const incoFilters = getMultiValues('inco');
-  const transporteurFilters = getMultiValues('transporteur');
 
   const yearLabel = getMultiLabel('year', 'Toutes années');
   const weekLabel = getMultiLabel('week', 'Toutes semaines');
