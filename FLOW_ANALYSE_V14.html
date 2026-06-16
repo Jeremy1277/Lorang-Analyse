@@ -2186,10 +2186,7 @@ function runAnalysis() {
       const refW = _selW.length ? _selW[0] : null;
       if (!refW) return null;
       const weeks = [refW-2, refW-1, refW, refW+1, refW+2].filter(w => w > 0 && w <= 53);
-      return weeks.map(w => {
-        const k = _weekKpis([w]);
-        return { week: w, t: Math.round(k.t), da: k.da };
-      });
+      return { selW: refW, points: weeks.map(w => { const k = _weekKpis([w]); return { week: w, t: Math.round(k.t), da: k.da }; }) };
     })()
   };
 
@@ -2420,8 +2417,9 @@ function renderReport(d) {
   (function() {
     const ctx = document.getElementById('weekTrendChart');
     if (!ctx) return;
-    const data = ${JSON.stringify(d.weekTrend)};
-    const selW = ${JSON.stringify(_selW.length ? _selW[0] : null)};
+    const wt   = ${JSON.stringify(d.weekTrend)};
+    const data  = wt.points;
+    const selW  = wt.selW;
     const labels = data.map(p => 'S' + p.week + (p.week === selW ? ' ◀' : ''));
     const vals   = data.map(p => p.t);
     const colors = data.map(p => p.week === selW ? '#004D8C' : p.week < selW ? '#86BC24' : '#f59e0b');
