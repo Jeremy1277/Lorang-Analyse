@@ -318,7 +318,16 @@
     position: relative;
     overflow: hidden;
   }
-  .kpi-card::after {
+  .kpi-trend { display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+.kpi-trend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.kpi-trend-item .trend-label { color: #8AA0B8; font-weight: 400; }
+.kpi-trend-item .trend-arrow { font-size: 13px; }
+.kpi-trend-item.up   .trend-arrow, .kpi-trend-item.up   .trend-pct { color: #86BC24; }
+.kpi-trend-item.down .trend-arrow, .kpi-trend-item.down .trend-pct { color: #C62828; }
+.kpi-trend-item.flat .trend-arrow, .kpi-trend-item.flat .trend-pct { color: #8AA0B8; }
+.kpi-trend-item .trend-val { color: #444; font-weight: 500; }
+.kpi-trend-item.partial .trend-label { font-style: italic; }
+.kpi-card::after {
     content: '';
     position: absolute;
     right: -10px; top: -10px;
@@ -2035,6 +2044,27 @@ function runAnalysis() {
   });
 
   const totalDA = daUniq.length;
+function computeWeekKpis(weekNums) {
+  const rows = daData.filter(r => r.DATE instanceof Date && matchSelected(r.DATE.getFullYear(), yearFilters) && weekNums.includes(r.SEMAINE) && matchSelected(r.DATE.getMonth()+1, confirmedMonthFilters) && matchSelected(r.EXPEDITEUR, siteFilters) && matchSelected(r.PAYS, paysFilters) && matchSelected(r.INCOTERME, incoFilters) && matchSelected(r.TRANSPORTEUR, transporteurFilters));
+  const map = {}; rows.forEach(r => { if (!map[r.DA]) map[r.DA] = r; });
+  const uniq = Object.values(map);
+  const cipRows = uniq.filter(r => r.INCOTERME === 'CIP');
+  const stdRows = uniq.filter(r => !r.REMORQUE.includes('EXTENSIBLE') && !r.REMORQUE.includes('DBLE'));
+  return { da: uniq.length, t: uniq.reduce((s,r)=>s+r.TONNES,0), cipPct: uniq.length ? Math.round(cipRows.length/uniq.length*100) : 0, avgStd: stdRows.length ? stdRows.reduce((s,r)=>s+r.TONNES,0)/stdRows.length : 0 };
+}
+function trendHtml(curr, prev, prevLabel, next, nextLabel) {
+  function ar(c,p) { if(!p&&p!==0) return {cls:'flat',sym:'--',pct:''}; const dd=p?((c-p)/p*100):0; return dd>1?{cls:'up',sym:'&#8593;',pct:'+'+Math.round(dd)+'%'}:dd<-1?{cls:'down',sym:'&#8595;',pct:Math.round(dd)+'%'}:{cls:'flat',sym:'&#8594;',pct:'~0%'}; }
+  function item(val, lbl, a, partial) { return '<div class="kpi-trend-item '+(partial?'partial ':'')+a.cls+'"><span class="trend-arrow">'+a.sym+'</span><span class="trend-pct">'+a.pct+'</span><span class="trend-val"> ('+val+')</span><span class="trend-label"> '+lbl+'</span></div>'; }
+  const ap=ar(curr,prev), an=ar(next,curr);
+  return '<div class="kpi-trend">'+item(prev,prevLabel,ap,false)+item(next,nextLabel,an,true)+'</div>';
+}
+const selWeeks = weekFilters.length ? weekFilters.map(Number) : [];
+const prevWeeks = selWeeks.map(w=>w-1).filter(w=>w>0);
+const nextWeeks = selWeeks.map(w=>w+1).filter(w=>w<=53);
+const kpiPrev = selWeeks.length ? computeWeekKpis(prevWeeks) : null;
+const kpiNext = selWeeks.length ? computeWeekKpis(nextWeeks) : null;
+const prevLabel = prevWeeks.length ? 'S'+prevWeeks[0] : '';
+const nextLabel = nextWeeks.length ? 'S'+nextWeeks[0]+'*' : '';
   const totalT = daUniq.reduce((s, r) => s + r.TONNES, 0);
   const cipDA = daUniq.filter(r => r.INCOTERME === 'CIP');
   const fcaDA = daUniq.filter(r => r.INCOTERME === 'FCA');
@@ -2341,21 +2371,25 @@ function renderReport(d) {
       <div class="kpi-label">DA chargées</div>
       <div class="kpi-value">${d.totalDA}</div>
       <div class="kpi-sub">${confirmedPeriodLabel}</div>
+      ${selWeeks.length&&kpiPrev&&kpiNext?trendHtml(d.totalDA,kpiPrev.da,prevLabel,kpiNext.da,nextLabel):""}
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Tonnage expédié</div>
       <div class="kpi-value">${fmt(d.totalT)} T</div>
       <div class="kpi-sub">CIP ${fmt(d.cipT)} · FCA ${fmt(d.fcaT)}</div>
+      ${selWeeks.length&&kpiPrev&&kpiNext?trendHtml(d.totalT,kpiPrev.t,prevLabel,kpiNext.t,nextLabel):""}
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Poids moyen STD</div>
       <div class="kpi-value">${fmt(d.avgStd)} T</div>
       <div class="kpi-sub">EXT : ${fmt(d.avgExt)} T</div>
+      ${selWeeks.length&&kpiPrev&&kpiNext?trendHtml(Math.round(d.avgStd*10)/10,kpiPrev.avgStd,prevLabel,kpiNext.avgStd,nextLabel):""}
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Ratio CIP cellule</div>
       <div class="kpi-value">${d.totalDA ? Math.round(d.cipDA/d.totalDA*100) : 0}%</div>
       <div class="kpi-sub">${d.cipDA} CIP / ${d.totalDA} DA</div>
+      ${selWeeks.length&&kpiPrev&&kpiNext?trendHtml((d.totalDA?Math.round(d.cipDA/d.totalDA*100):0),kpiPrev.cipPct,prevLabel,kpiNext.cipPct,nextLabel):""}
     </div>
   </div>
 
