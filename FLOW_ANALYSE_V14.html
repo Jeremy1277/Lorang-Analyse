@@ -318,15 +318,18 @@
     position: relative;
     overflow: hidden;
   }
-  .kpi-trend { display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
-.kpi-trend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; }
-.kpi-trend-item .trend-label { color: #8AA0B8; font-weight: 400; }
-.kpi-trend-item .trend-arrow { font-size: 13px; }
-.kpi-trend-item.up   .trend-arrow, .kpi-trend-item.up   .trend-pct { color: #86BC24; }
-.kpi-trend-item.down .trend-arrow, .kpi-trend-item.down .trend-pct { color: #C62828; }
-.kpi-trend-item.flat .trend-arrow, .kpi-trend-item.flat .trend-pct { color: #8AA0B8; }
-.kpi-trend-item .trend-val { color: #444; font-weight: 500; }
-.kpi-trend-item.partial .trend-label { font-style: italic; }
+  .kpi-grid-trend { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 6px; }
+.kpi-card-prev { background: #e8f5d0; border: 1px solid #86BC24; border-radius: 10px; padding: 10px 16px; }
+.kpi-card-next { background: #fff3e0; border: 1px solid #f59e0b; border-radius: 10px; padding: 10px 16px; }
+.kpi-card-prev .tc-label, .kpi-card-next .tc-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+.kpi-card-prev .tc-label { color: #4a7c10; }
+.kpi-card-next .tc-label { color: #b45309; }
+.kpi-card-prev .tc-val, .kpi-card-next .tc-val { font-size: 20px; font-weight: 700; }
+.kpi-card-prev .tc-val { color: #3d6e0d; }
+.kpi-card-next .tc-val { color: #92400e; }
+.kpi-card-prev .tc-trend, .kpi-card-next .tc-trend { font-size: 11px; margin-top: 2px; }
+.kpi-card-prev .tc-trend { color: #4a7c10; }
+.kpi-card-next .tc-trend { color: #b45309; font-style: italic; }
 .kpi-card::after {
     content: '';
     position: absolute;
@@ -1997,27 +2000,23 @@ function runAnalysis() {
   const paysFilters = getMultiValues('pays');
   const incoFilters = getMultiValues('inco');
   const transporteurFilters = getMultiValues('transporteur');
-function computeWeekKpis(weekNums) {
-  const rows = daData.filter(r => r.DATE instanceof Date && matchSelected(r.DATE.getFullYear(), yearFilters) && weekNums.includes(r.SEMAINE) && matchSelected(r.DATE.getMonth()+1, confirmedMonthFilters) && matchSelected(r.EXPEDITEUR, siteFilters) && matchSelected(r.PAYS, paysFilters) && matchSelected(r.INCOTERME, incoFilters) && matchSelected(r.TRANSPORTEUR, transporteurFilters));
-  const map = {}; rows.forEach(r => { if (!map[r.DA]) map[r.DA] = r; });
-  const uniq = Object.values(map);
-  const cipRows = uniq.filter(r => r.INCOTERME === 'CIP');
-  const stdRows = uniq.filter(r => !r.REMORQUE.includes('EXTENSIBLE') && !r.REMORQUE.includes('DBLE'));
-  return { da: uniq.length, t: uniq.reduce((s,r)=>s+r.TONNES,0), cipPct: uniq.length ? Math.round(cipRows.length/uniq.length*100) : 0, avgStd: stdRows.length ? stdRows.reduce((s,r)=>s+r.TONNES,0)/stdRows.length : 0 };
-}
-function trendHtml(curr, prev, prevLabel, next, nextLabel) {
-  function ar(c,p) { if(!p&&p!==0) return {cls:'flat',sym:'--',pct:''}; const dd=p?((c-p)/p*100):0; return dd>1?{cls:'up',sym:'&#8593;',pct:'+'+Math.round(dd)+'%'}:dd<-1?{cls:'down',sym:'&#8595;',pct:Math.round(dd)+'%'}:{cls:'flat',sym:'&#8594;',pct:'~0%'}; }
-  function item(val, lbl, a, partial) { return '<div class="kpi-trend-item '+(partial?'partial ':'')+a.cls+'"><span class="trend-arrow">'+a.sym+'</span><span class="trend-pct">'+a.pct+'</span><span class="trend-val"> ('+val+')</span><span class="trend-label"> '+lbl+'</span></div>'; }
-  const ap=ar(curr,prev), an=ar(next,curr);
-  return '<div class="kpi-trend">'+item(prev,prevLabel,ap,false)+item(next,nextLabel,an,true)+'</div>';
-}
-const selWeeks = weekFilters.length ? weekFilters.map(Number) : [];
-const prevWeeks = selWeeks.map(w=>w-1).filter(w=>w>0);
-const nextWeeks = selWeeks.map(w=>w+1).filter(w=>w<=53);
-const kpiPrev = selWeeks.length ? computeWeekKpis(prevWeeks) : null;
-const kpiNext = selWeeks.length ? computeWeekKpis(nextWeeks) : null;
-const prevLabel = prevWeeks.length ? 'S'+prevWeeks[0] : '';
-const nextLabel = nextWeeks.length ? 'S'+nextWeeks[0]+'*' : '';
+  // Calcul tendances S-1 / S+1
+  const _selW = weekFilters.length ? weekFilters.map(Number) : [];
+  function _weekKpis(wnums) {
+    const _rows = daData.filter(r => r.DATE instanceof Date && matchSelected(r.DATE.getFullYear(), yearFilters) && wnums.includes(r.SEMAINE) && matchSelected(r.DATE.getMonth()+1, confirmedMonthFilters) && matchSelected(r.EXPEDITEUR, siteFilters) && matchSelected(r.PAYS, paysFilters) && matchSelected(r.INCOTERME, incoFilters) && matchSelected(r.TRANSPORTEUR, transporteurFilters));
+    const _m = {}; _rows.forEach(r => { if (!_m[r.DA]) _m[r.DA] = r; });
+    const _u = Object.values(_m);
+    const _cip = _u.filter(r => r.INCOTERME === 'CIP');
+    const _std = _u.filter(r => !r.REMORQUE.includes('EXTENSIBLE') && !r.REMORQUE.includes('DBLE'));
+    return { da: _u.length, t: _u.reduce((s,r)=>s+r.TONNES,0), cipPct: _u.length ? Math.round(_cip.length/_u.length*100) : 0, avgStd: _std.length ? _std.reduce((s,r)=>s+r.TONNES,0)/_std.length : 0 };
+  }
+  const _prevW = _selW.map(w=>w-1).filter(w=>w>0);
+  const _nextW = _selW.map(w=>w+1).filter(w=>w<=53);
+  const _kpiPrev = _selW.length ? _weekKpis(_prevW) : null;
+  const _kpiNext = _selW.length ? _weekKpis(_nextW) : null;
+  const _pLbl = _prevW.length ? 'S'+_prevW[0] : '';
+  const _nLbl = _nextW.length ? 'S'+_nextW[0] : '';
+  function _pct(a, b) { if (!b) return ''; const d = Math.round((a-b)/b*100); return (d>0?'+':'')+d+'%'; }
 
   const yearLabel = getMultiLabel('year', 'Toutes années');
   const weekLabel = getMultiLabel('week', 'Toutes semaines');
@@ -2371,27 +2370,39 @@ function renderReport(d) {
       <div class="kpi-label">DA chargées</div>
       <div class="kpi-value">${d.totalDA}</div>
       <div class="kpi-sub">${confirmedPeriodLabel}</div>
-      ${selWeeks.length&&kpiPrev&&kpiNext?trendHtml(d.totalDA,kpiPrev.da,prevLabel,kpiNext.da,nextLabel):""}
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Tonnage expédié</div>
       <div class="kpi-value">${fmt(d.totalT)} T</div>
       <div class="kpi-sub">CIP ${fmt(d.cipT)} · FCA ${fmt(d.fcaT)}</div>
-      ${selWeeks.length&&kpiPrev&&kpiNext?trendHtml(d.totalT,kpiPrev.t,prevLabel,kpiNext.t,nextLabel):""}
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Poids moyen STD</div>
       <div class="kpi-value">${fmt(d.avgStd)} T</div>
       <div class="kpi-sub">EXT : ${fmt(d.avgExt)} T</div>
-      ${selWeeks.length&&kpiPrev&&kpiNext?trendHtml(Math.round(d.avgStd*10)/10,kpiPrev.avgStd,prevLabel,kpiNext.avgStd,nextLabel):""}
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Ratio CIP cellule</div>
       <div class="kpi-value">${d.totalDA ? Math.round(d.cipDA/d.totalDA*100) : 0}%</div>
       <div class="kpi-sub">${d.cipDA} CIP / ${d.totalDA} DA</div>
-      ${selWeeks.length&&kpiPrev&&kpiNext?trendHtml((d.totalDA?Math.round(d.cipDA/d.totalDA*100):0),kpiPrev.cipPct,prevLabel,kpiNext.cipPct,nextLabel):""}
     </div>
   </div>
+
+  ${_selW.length && _kpiPrev ? `
+  <div class="kpi-grid-trend">
+    <div class="kpi-card-prev"><div class="tc-label">&#9664; ${_pLbl} (réel)</div><div class="tc-val">${_kpiPrev.da} DA</div><div class="tc-trend">${_pct(_kpiPrev.da, _kpiPrev.da)} vs S actuelle</div></div>
+    <div class="kpi-card-prev"><div class="tc-label">&#9664; ${_pLbl} Tonnage</div><div class="tc-val">${fmt(_kpiPrev.t)} T</div><div class="tc-trend">${_pct(_kpiPrev.t, d.totalT)} vs S actuelle</div></div>
+    <div class="kpi-card-prev"><div class="tc-label">&#9664; ${_pLbl} Poids moy.</div><div class="tc-val">${fmt(_kpiPrev.avgStd)} T</div><div class="tc-trend">${_pct(_kpiPrev.avgStd, d.avgStd)} vs S actuelle</div></div>
+    <div class="kpi-card-prev"><div class="tc-label">&#9664; ${_pLbl} CIP</div><div class="tc-val">${_kpiPrev.cipPct}%</div><div class="tc-trend">${_pct(_kpiPrev.cipPct, (d.totalDA?Math.round(d.cipDA/d.totalDA*100):0))} vs S actuelle</div></div>
+  </div>` : ''}
+
+  ${_selW.length && _kpiNext ? `
+  <div class="kpi-grid-trend">
+    <div class="kpi-card-next"><div class="tc-label">&#9654; ${_nLbl} (tendance)</div><div class="tc-val">${_kpiNext.da} DA</div><div class="tc-trend">${_pct(_kpiNext.da, d.totalDA)} vs S actuelle</div></div>
+    <div class="kpi-card-next"><div class="tc-label">&#9654; ${_nLbl} Tonnage</div><div class="tc-val">${fmt(_kpiNext.t)} T</div><div class="tc-trend">${_pct(_kpiNext.t, d.totalT)} vs S actuelle</div></div>
+    <div class="kpi-card-next"><div class="tc-label">&#9654; ${_nLbl} Poids moy.</div><div class="tc-val">${fmt(_kpiNext.avgStd)} T</div><div class="tc-trend">${_pct(_kpiNext.avgStd, d.avgStd)} vs S actuelle</div></div>
+    <div class="kpi-card-next"><div class="tc-label">&#9654; ${_nLbl} CIP</div><div class="tc-val">${_kpiNext.cipPct}%</div><div class="tc-trend">${_pct(_kpiNext.cipPct, (d.totalDA?Math.round(d.cipDA/d.totalDA*100):0))} vs S actuelle</div></div>
+  </div>` : ''}
 
   ${alertsHtml}
 
