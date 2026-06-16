@@ -328,6 +328,8 @@
 .kpi-card-next .tc-val { font-size: 20px; font-weight: 700; color: #92400e; }
 .kpi-card-prev .tc-trend { font-size: 11px; margin-top: 2px; color: #4a7c10; }
 .kpi-card-next .tc-trend { font-size: 11px; margin-top: 2px; color: #b45309; font-style: italic; }
+.trend-chart-card { background: white; border-radius: 10px; padding: 16px 20px; margin-bottom: 12px; box-shadow: 0 1px 6px rgba(0,0,0,.08); border: 1px solid #e8edf2; }
+.trend-chart-card .chart-title { font-size: 12px; font-weight: 700; color: #004D8C; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 12px; }
 .kpi-card::after {
     content: '';
     position: absolute;
@@ -2179,7 +2181,16 @@ function runAnalysis() {
     totalSapT, cipSapT, fcaSapT,
     bySemFc, byPaysFc, bySiteFc, extFcT, stdFcT,
     codes2list, c2cipT, c2fcaT,
-    kpiPrev, kpiNext, kpiPrevLbl, kpiNextLbl
+    kpiPrev, kpiNext, kpiPrevLbl, kpiNextLbl,
+    weekTrend: (() => {
+      const refW = _selW.length ? _selW[0] : null;
+      if (!refW) return null;
+      const weeks = [refW-2, refW-1, refW, refW+1, refW+2].filter(w => w > 0 && w <= 53);
+      return weeks.map(w => {
+        const k = _weekKpis([w]);
+        return { week: w, t: Math.round(k.t), da: k.da };
+      });
+    })()
   };
 
   renderReport(analysisResult);
@@ -2399,6 +2410,68 @@ function renderReport(d) {
     <div class="kpi-card-next"><div class="tc-label">&#9654; ${d.kpiNextLbl} Poids moy.</div><div class="tc-val">${fmt(d.kpiNext.avgStd)} T</div><div class="tc-trend">${d.avgStd ? (d.kpiNext.avgStd>d.avgStd?'&#8593;':d.kpiNext.avgStd<d.avgStd?'&#8595;':'&#8594;')+' '+Math.round((d.kpiNext.avgStd-d.avgStd)/d.avgStd*100)+'%' : ''} vs S act.</div></div>
     <div class="kpi-card-next"><div class="tc-label">&#9654; ${d.kpiNextLbl} CIP</div><div class="tc-val">${d.kpiNext.cipPct}%</div><div class="tc-trend">${(()=>{const c=d.totalDA?Math.round(d.cipDA/d.totalDA*100):0; return c?(d.kpiNext.cipPct>c?'&#8593;':d.kpiNext.cipPct<c?'&#8595;':'&#8594;')+' '+Math.round((d.kpiNext.cipPct-c)/c*100)+'%':''})()}} vs S act.</div></div>
   </div>` : ''}
+
+  ${d.weekTrend ? `
+  <div class="trend-chart-card">
+    <div class="chart-title">&#128200; Tonnage total par semaine — 5 semaines glissantes</div>
+    <canvas id="weekTrendChart" height="80"></canvas>
+  </div>
+  <script>
+  (function() {
+    const ctx = document.getElementById('weekTrendChart');
+    if (!ctx) return;
+    const data = ${JSON.stringify(d.weekTrend)};
+    const selW = ${JSON.stringify(_selW.length ? _selW[0] : null)};
+    const labels = data.map(p => 'S' + p.week + (p.week === selW ? ' ◀' : ''));
+    const vals   = data.map(p => p.t);
+    const colors = data.map(p => p.week === selW ? '#004D8C' : p.week < selW ? '#86BC24' : '#f59e0b');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Tonnage (T)',
+          data: vals,
+          borderColor: '#004D8C',
+          backgroundColor: 'rgba(0,77,140,.07)',
+          borderWidth: 2.5,
+          pointBackgroundColor: colors,
+          pointBorderColor: colors,
+          pointRadius: 6,
+          pointHoverRadius: 8,
+          fill: true,
+          tension: 0.3
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => ' ' + ctx.parsed.y.toLocaleString('fr-FR') + ' T'
+            }
+          },
+          datalabels: { display: false }
+        },
+        scales: {
+          y: {
+            beginAtZero: false,
+            ticks: {
+              callback: v => v.toLocaleString('fr-FR') + ' T',
+              font: { size: 11 }
+            },
+            grid: { color: 'rgba(0,0,0,.05)' }
+          },
+          x: {
+            ticks: { font: { size: 12, weight: '600' } },
+            grid: { display: false }
+          }
+        }
+      }
+    });
+  })();
+  <\/script>` : ''}
 
   ${alertsHtml}
 
