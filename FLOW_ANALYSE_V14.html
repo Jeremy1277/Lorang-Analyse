@@ -433,10 +433,133 @@
     padding: 10px;
     text-align: center;
     border: 1px solid var(--border);
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s;
+  }
+  .day-card:hover {
+    border-color: var(--am-navy);
+    box-shadow: 0 4px 14px rgba(13,27,42,0.13);
+    transform: translateY(-2px);
   }
   .day-name { font-size: 10px; color: var(--text-muted); margin-bottom: 4px; }
   .day-val { font-family: 'DM Mono', monospace; font-size: 20px; font-weight: 500; color: var(--am-navy); }
   .day-sub { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+  /* ── DAY DETAIL MODAL ── */
+  .day-detail-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 28px;
+    background: rgba(13,27,42,0.62);
+    backdrop-filter: blur(3px);
+  }
+  .day-detail-modal.visible { display: flex; }
+  .day-detail-panel {
+    width: min(860px, 96vw);
+    max-height: 86vh;
+    background: var(--card);
+    border-radius: 16px;
+    box-shadow: 0 18px 60px rgba(0,0,0,0.35);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: modalPop 0.16s ease-out;
+  }
+  .day-detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 18px;
+    background: var(--am-navy);
+    color: white;
+    flex-shrink: 0;
+  }
+  .day-detail-title {
+    font-family: 'Barlow', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+  }
+  .day-detail-subtitle {
+    font-size: 11px;
+    font-weight: 400;
+    color: rgba(255,255,255,.62);
+    margin-top: 2px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .day-detail-close {
+    border: none;
+    background: rgba(255,255,255,0.14);
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .day-detail-close:hover { background: rgba(255,255,255,0.24); }
+  .day-detail-body {
+    overflow-y: auto;
+    padding: 16px 18px;
+    flex: 1;
+  }
+  .day-detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .day-detail-table thead th {
+    background: var(--bg);
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    padding: 7px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+  }
+  .day-detail-table tbody tr:hover { background: var(--bg); }
+  .day-detail-table tbody td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    vertical-align: middle;
+  }
+  .day-detail-table tbody tr:last-child td { border-bottom: none; }
+  .day-detail-kpis {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .day-detail-kpi {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    text-align: center;
+  }
+  .day-detail-kpi-val {
+    font-family: 'DM Mono', monospace;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--am-navy);
+  }
+  .day-detail-kpi-lbl { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
 
   /* ── SEMAINE FORECAST ── */
   .sem-block {
@@ -1563,6 +1686,20 @@
   </div>
 </div>
 
+<!-- DAY DETAIL POPUP -->
+<div class="day-detail-modal" id="day-detail-modal" aria-hidden="true" onclick="closeDayDetail(event)">
+  <div class="day-detail-panel" role="dialog" aria-modal="true" onclick="event.stopPropagation()">
+    <div class="day-detail-header">
+      <div>
+        <div class="day-detail-title" id="day-detail-title">Chargements du jour</div>
+        <div class="day-detail-subtitle" id="day-detail-subtitle"></div>
+      </div>
+      <button class="day-detail-close" type="button" onclick="closeDayDetail()" aria-label="Fermer">×</button>
+    </div>
+    <div class="day-detail-body" id="day-detail-body"></div>
+  </div>
+</div>
+
 <!-- VISUAL POPUP -->
 <div class="visual-modal" id="visual-modal" aria-hidden="true" onclick="closeVisualPopup(event)">
   <div class="visual-modal-panel" role="dialog" aria-modal="true" aria-labelledby="visual-modal-title" onclick="event.stopPropagation()">
@@ -2087,10 +2224,13 @@ function runAnalysis() {
 
   // Par jour — utiliser les composantes locales pour éviter le décalage UTC
   const byDay = {};
+  const byDayDetails = {};
   daUniq.forEach(r => {
     const d = r.DATE;
     const k = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     byDay[k] = (byDay[k] || 0) + 1;
+    if (!byDayDetails[k]) byDayDetails[k] = [];
+    byDayDetails[k].push(r);
   });
 
   // Par pays
@@ -2177,7 +2317,7 @@ function runAnalysis() {
     totalSapLines: sapMonth.length,
     totalDA, totalT, cipDA: cipDA.length, fcaDA: fcaDA.length, cipT, fcaT,
     avgStd, avgExt, monthlyDA,
-    bySite, byDay, byPays, byRem,
+    bySite, byDay, byDayDetails, byPays, byRem,
     totalSapT, cipSapT, fcaSapT,
     bySemFc, byPaysFc, bySiteFc, extFcT, stdFcT,
     codes2list, c2cipT, c2fcaT,
@@ -2241,7 +2381,7 @@ function renderReport(d) {
     // Parser en heure locale pour éviter le décalage UTC (ex: "2026-05-04T12:00:00" au lieu de "2026-05-04")
     const dt = new Date(dateStr + 'T12:00:00');
     const dayLabel = `${DAYS_FR[dt.getDay()]} ${dt.getDate().toString().padStart(2,'0')}/${(dt.getMonth()+1).toString().padStart(2,'0')}`;
-    daysHtml += `<div class="day-card"><div class="day-name">${dayLabel}</div><div class="day-val">${count}</div><div class="day-sub">DA</div></div>`;
+    daysHtml += `<div class="day-card" onclick="openDayDetail('${dateStr}')" title="Voir le détail des chargements"><div class="day-name">${dayLabel}</div><div class="day-val">${count}</div><div class="day-sub">DA</div></div>`;
   });
   const dayGrid = days.length <= 4 ? 'grid-template-columns:repeat(4,1fr)' : 'grid-template-columns:repeat(5,1fr)';
 
@@ -2811,6 +2951,70 @@ function closeDaDisplay(evt) {
   document.querySelectorAll('#da-display-modal .multi-filter.open').forEach(el => el.classList.remove('open'));
 }
 
+function openDayDetail(dateStr) {
+  if (!analysisResult || !analysisResult.byDayDetails) return;
+  const rows = analysisResult.byDayDetails[dateStr];
+  if (!rows || !rows.length) return;
+
+  // Label jour
+  const dt = new Date(dateStr + 'T12:00:00');
+  const dayLabel = DAYS_FR[dt.getDay()] + ' ' + dt.getDate().toString().padStart(2,'0') + '/' + (dt.getMonth()+1).toString().padStart(2,'0') + '/' + dt.getFullYear();
+
+  // KPIs
+  const totalDA = rows.length;
+  const totalT = rows.reduce((s, r) => s + r.TONNES, 0);
+  const cipCount = rows.filter(r => r.INCOTERME === 'CIP').length;
+  const fcaCount = rows.filter(r => r.INCOTERME === 'FCA').length;
+
+  const kpisHtml = '<div class="day-detail-kpis">' +
+    '<div class="day-detail-kpi"><div class="day-detail-kpi-val">' + totalDA + '</div><div class="day-detail-kpi-lbl">DA total</div></div>' +
+    '<div class="day-detail-kpi"><div class="day-detail-kpi-val">' + fmt(totalT) + ' T</div><div class="day-detail-kpi-lbl">Tonnage</div></div>' +
+    '<div class="day-detail-kpi"><div class="day-detail-kpi-val">' + cipCount + '</div><div class="day-detail-kpi-lbl">CIP</div></div>' +
+    '<div class="day-detail-kpi"><div class="day-detail-kpi-val">' + fcaCount + '</div><div class="day-detail-kpi-lbl">FCA</div></div>' +
+  '</div>';
+
+  // Tableau
+  const rowsHtml = rows.map(r => {
+    const incoClass = r.INCOTERME === 'CIP' ? 'color:#1a9e5c;font-weight:600' : 'color:#c25a00;font-weight:600';
+    return '<tr>' +
+      '<td style="font-family:\'DM Mono\',monospace;font-weight:600">' + (r.DA || '—') + '</td>' +
+      '<td>' + (r.SAP || '—') + '</td>' +
+      '<td>' + (SITE_MAP[r.EXPEDITEUR] || r.EXPEDITEUR || '—') + '</td>' +
+      '<td>' + (r.TRANSPORTEUR || '—') + '</td>' +
+      '<td><span style="' + incoClass + '">' + (r.INCOTERME || '—') + '</span></td>' +
+      '<td>' + (r.PAYS || '—') + '</td>' +
+      '<td>' + (r.VILLE || '—') + '</td>' +
+      '<td style="text-align:right;font-family:\'DM Mono\',monospace">' + fmt(r.TONNES) + ' T</td>' +
+      '<td>' + (r.REMORQUE || '—') + '</td>' +
+    '</tr>';
+  }).join('');
+
+  const tableHtml = '<table class="day-detail-table">' +
+    '<thead><tr>' +
+      '<th>DA</th><th>SAP</th><th>Site</th><th>Transporteur</th><th>Inco</th><th>Pays</th><th>Ville</th><th>Tonnage</th><th>Remorque</th>' +
+    '</tr></thead>' +
+    '<tbody>' + rowsHtml + '</tbody>' +
+  '</table>';
+
+  document.getElementById('day-detail-title').textContent = 'Chargements — ' + dayLabel;
+  document.getElementById('day-detail-subtitle').textContent = totalDA + ' DA · ' + fmt(totalT) + ' T';
+  document.getElementById('day-detail-body').innerHTML = kpisHtml + tableHtml;
+
+  const modal = document.getElementById('day-detail-modal');
+  modal.classList.add('visible');
+  modal.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('modal-open');
+}
+
+function closeDayDetail(evt) {
+  if (evt && evt.target && evt.target.closest && evt.target.closest('.day-detail-panel')) return;
+  const modal = document.getElementById('day-detail-modal');
+  if (!modal) return;
+  modal.classList.remove('visible');
+  modal.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('modal-open');
+}
+
 function updateDaDateMode() {
   const mode = document.getElementById('da-display-date-mode')?.value || '';
   const fixed = document.getElementById('da-display-date-fixed');
@@ -3050,6 +3254,10 @@ function closeVisualPopup(evt) {
 
 document.addEventListener('keydown', evt => {
   if (evt.key === 'Escape') closeVisualPopup();
+});
+
+document.addEventListener('keydown', evt => {
+  if (evt.key === 'Escape') closeDayDetail();
 });
 
 function fmt(n) {
